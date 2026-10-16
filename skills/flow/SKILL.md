@@ -38,6 +38,8 @@ Too big or too foggy for one session: `wayfinder`* first; when its map clears, e
 - Comment cleanup before review → `no-comments`*.
 - Context hand-off to a new session, harness, or person → `handoff`*.
 - Learning a concept over several sessions → `teach`*.
+- UI polish and design critique → `emil-design-eng`. Worst-case data in a screen → `break-ui`. Build motion → `animate`; where motion is missing → `find-animation-opportunities`; dropped frames → `animation-performance`; audit or review existing motion → `improve-animations`, `review-animations`*. Name an effect → `animation-vocabulary`. Gesture and spring UI → `apple-design`. Choosing a frontend library → `pick-ui-library`*. Sonner toasts → `ask-sonner`.
+- Patterns in past agent sessions, repeated corrections → `analyze-sessions`.
 
 Setup and one-off skills (`setup-pre-commit`, `git-guardrails-claude-code`, `migrate-to-shoehorn`, `scaffold-exercises`, `wizard`) fire on their own descriptions. `wait-what`* is the user's re-pitch request. Upstream back-import for this skill set → `skills-sync`*.
 
@@ -48,4 +50,5 @@ Setup and one-off skills (`setup-pre-commit`, `git-guardrails-claude-code`, `mig
 - Detect the tracker per repo: `tickets/` → direct `foreman` ticket commands; otherwise `.beads/` → `bd` until user-approved `foreman adopt`. With neither, ask to onboard. The `foreman` skill separates ticket content from best-effort board events.
 - Build-time questions go through `foreman ask decision` and `foreman wait`, not pane prompts. Spec interviews and grilling stay conversational.
 - At coordinator close-out, use `foreman` through `dispatch`: `review` before checking, `changes` (`request_changes`) when returning findings, `commit` after an authorized commit, then push/open_pr requests (merge when next) and waits. Telemetry warnings never block work; unresolved approval requests block their dependent steps. Agents never push; pushes go through board requests.
+- A repo or workspace skill that runs its own build loop wins over `dispatch` there.
 - Claude subagents (Agent tool; pi `subagent`) only when the user asks for them. This overrides any skill that says to dispatch or fan out subagents: run that work sequentially in context instead, or ask first.

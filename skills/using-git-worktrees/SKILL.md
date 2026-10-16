@@ -3,7 +3,7 @@ name: using-git-worktrees
 description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback
 ---
 
-<!-- house: adopt; from: superpowers:skills/using-git-worktrees@bb92a77 -->
+<!-- house: adapt; from: superpowers:skills/using-git-worktrees@bb92a77. Edits: `--no-track` on the fallback `git worktree add`, and an upstream check after any worktree is created (a branch cut from origin/<shared> with push.default=tracking pushes straight to the shared branch). -->
 
 # Using Git Worktrees
 
@@ -95,9 +95,17 @@ git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/d
 # Determine path based on chosen location
 path="$LOCATION/$BRANCH_NAME"
 
-git worktree add "$path" -b "$BRANCH_NAME"
+git worktree add "$path" -b "$BRANCH_NAME" --no-track
 cd "$path"
 ```
+
+**Check the upstream** after any worktree is created, native tool or fallback:
+
+```bash
+git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "no upstream"
+```
+
+Expect `no upstream`. If it names a shared branch (`origin/main`, `origin/staging`), run `git branch --unset-upstream` before any push: with `push.default=tracking`, a plain `git push` lands on that shared branch. The first push is always explicit: `git push -u origin <branch>`, and only when the user asks.
 
 **Sandbox fallback:** If `git worktree add` fails with a permission error (sandbox denial), tell the user the sandbox blocked worktree creation and you're working in the current directory instead. Then run setup and baseline tests in place.
 

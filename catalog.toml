@@ -40,6 +40,11 @@ job = "keep-foreman-current"
 mode = "own"
 from = []
 
+[sources.emilkowalski]
+repo = "https://github.com/emilkowalski/skills"
+path = "~/dev/utils/skill-sources/emilkowalski"
+pin = "2d228630ba1446365f614a108cb8252f1feda202"
+
 [[skill]]
 name = "tight-spec"
 job = "spec"
@@ -178,7 +183,7 @@ from = ["mattpocock:skills/productivity/teach"]
 [[skill]]
 name = "using-git-worktrees"
 job = "worktree-isolation"
-mode = "adopt"
+mode = "adapt"
 from = ["superpowers:skills/using-git-worktrees"]
 
 [[skill]]
@@ -469,3 +474,94 @@ name = "show-me"
 job = "explain-visually"
 mode = "adapt"
 from = ["humanlayer:plugins/show-me/skills/show-me"]
+
+# --- UI, design and motion (emilkowalski) ---
+
+[[skill]]
+name = "animate"
+job = "motion-build"
+mode = "adopt"
+from = ["emilkowalski:skills/animate"]
+
+[[skill]]
+name = "animation-performance"
+job = "motion-performance"
+mode = "adopt"
+from = ["emilkowalski:skills/animation-performance"]
+
+[[skill]]
+name = "animation-vocabulary"
+job = "motion-terms"
+mode = "adopt"
+from = ["emilkowalski:skills/animation-vocabulary"]
+
+[[skill]]
+name = "apple-design"
+job = "apple-style-ui"
+mode = "adopt"
+from = ["emilkowalski:skills/apple-design"]
+
+[[skill]]
+name = "ask-sonner"
+job = "sonner-toasts"
+mode = "adopt"
+from = ["emilkowalski:skills/ask-sonner"]
+
+[[skill]]
+name = "break-ui"
+job = "ui-worst-case-data"
+mode = "adopt"
+from = ["emilkowalski:skills/break-ui"]
+
+[[skill]]
+name = "emil-design-eng"
+job = "ui-polish"
+mode = "adopt"
+from = ["emilkowalski:skills/emil-design-eng"]
+
+[[skill]]
+name = "find-animation-opportunities"
+job = "motion-opportunities"
+mode = "adopt"
+from = ["emilkowalski:skills/find-animation-opportunities"]
+
+[[skill]]
+name = "improve-animations"
+job = "motion-audit"
+mode = "adopt"
+from = ["emilkowalski:skills/improve-animations"]
+
+[[skill]]
+name = "pick-ui-library"
+job = "ui-library-choice"
+mode = "adopt"
+from = ["emilkowalski:skills/pick-ui-library"]
+
+[[skill]]
+name = "review-animations"
+job = "motion-review"
+mode = "adopt"
+from = ["emilkowalski:skills/review-animations"]
+
+[[drop]]
+from = "emilkowalski:skills/prototype"
+reason = "Name collides with the house prototype (mattpocock), whose UI.md already covers throwaway UI variants."
+
+[[drop]]
+from = "emilkowalski:skills/animate-expo"
+reason = "React Native and Expo only; no React Native work in the current stack."
+
+[[drop]]
+from = "emilkowalski:skills/write-swift"
+reason = "Swift style guide, not a workflow; no Swift work in the current stack."
+
+[[drop]]
+from = "emilkowalski:skills/mobile-native"
+reason = "Phone-browser fixes; current work is desktop-first."
+
+# --- own: session audit ---
+
+[[skill]]
+name = "analyze-sessions"
+job = "session-audit"
+mode = "own"
