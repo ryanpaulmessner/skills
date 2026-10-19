@@ -90,7 +90,7 @@ Agents never push. Pushes go through board requests; the board worker performs a
 | Build-time question | `foreman ask decision <ticket> --question "<question>" --option "<A>" --option "<B>" --recommendation "<A>"` |
 | Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` |
 | Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` |
-| Merge | `foreman ask merge <ticket> --pr <number> --sha <expected-head-sha>` |
+| Merge (board-merge repos only) | `foreman ask merge <ticket> --pr <number> --sha <expected-head-sha>` |
 
 Add `--project <configured-project>` when needed for resolution. Decision options and recommendation
 are optional; `--text "<context>"` adds context. PR body-file bytes are preserved. Use the `pr` skill
@@ -118,10 +118,20 @@ Wait always prints JSON:
 
 Push/open_pr require board stage `committed`. Do not close the ticket before these requests resolve:
 completion supersedes pending requests. `forge = "none"` ends at commit, without action asks.
-Default-branch pushes are only for one-off tickets without an epic; epic work reaches default through
-PRs. Push binds worktree, local branch, SHA and destination; open_pr binds the remote head SHA and
+Default-branch pushes are only for one-off tickets without an epic (never in human-merge repos);
+epic work reaches default through PRs. Push binds worktree, local branch, SHA and destination; open_pr binds the remote head SHA and
 base. After push `done`, allow the board's branch snapshot to refresh before asking open_pr; a
 snapshot refusal is not permission to open it directly. Never weaken guards or fabricate stage events.
+
+**Human-merge repos** (`merge_policy = "human"` on the repo or at the top of `foreman.toml`; the
+work repos): every change reaches a shared branch through a GitHub PR that a person merges.
+Close-out ends at `push` (to a feature branch) then `open_pr` with `--base` = the repo's
+`merge_base` (or, for a stack, the parent PR's head branch). The board refuses `ask merge`
+(`human_merge_policy`) and any push to the base or default branch (`human_merge_base_branch`),
+one-off tickets included. Report the PR URL and keep the ticket open: forge sync moves it to
+`merged` when GitHub reports the PR merged (merge commit, squash or rebase). Children of a merged
+parent are not retargeted; leave that to the person on GitHub. Never fall back to `git merge`,
+`gh pr merge` or a direct push.
 
 ## Project-size specs only
 

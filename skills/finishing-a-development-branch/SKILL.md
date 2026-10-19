@@ -3,7 +3,7 @@ name: finishing-a-development-branch
 description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work
 ---
 
-<!-- house: adapt; from: superpowers:skills/finishing-a-development-branch@bb92a77. Edits: push/PR options run only on an explicit user request, otherwise report the exact commands (agents never git push here; hooks block it); "Superpowers created this worktree" -> using-git-worktrees; Quick Reference push column. -->
+<!-- house: adapt; from: superpowers:skills/finishing-a-development-branch@bb92a77. Edits: push/PR options run only on an explicit user request, otherwise report the exact commands (agents never git push here; hooks block it); "Superpowers created this worktree" -> using-git-worktrees; Quick Reference push column; human-merge repos (foreman `merge_policy = "human"`) get no local-merge option and the PR targets their `merge_base`. -->
 
 # Finishing a Development Branch
 
@@ -44,6 +44,14 @@ This determines which menu to show and how cleanup works:
 | `GIT_DIR == GIT_COMMON` (normal repo) | Standard 3 options | No worktree to clean up |
 | `GIT_DIR != GIT_COMMON`, named branch | Standard 3 options | Provenance-based (see Step 6) |
 | `GIT_DIR != GIT_COMMON`, detached HEAD | Reduced 2 options (no merge) | Externally managed — leave in place |
+| Human-merge repo (any of the above) | Human-merge 2 options (no merge) | Worktree kept (PR or keep as-is) |
+
+**Human-merge repo:** the repo's entry in `~/.config/foreman/foreman.toml` (or
+`foreman.local.toml`) has `merge_policy = "human"`, or the file sets it at the top level
+and the entry does not override it. Every change reaches a shared branch through a GitHub
+PR that a person merges on GitHub; agents never merge, locally or on the forge. The base
+branch is the entry's `merge_base` (ReportSystem: `staging`), or for a stack the parent
+PR's branch.
 
 ## Step 3: Determine Base Branch
 
@@ -77,6 +85,19 @@ Implementation complete. You're on a detached HEAD (externally managed workspace
 Which option?
 ```
 
+**Human-merge repo (any HEAD state) — present exactly these 2 options:**
+
+```
+Implementation complete. This repo's changes reach <base-branch> only through a GitHub PR that a person merges.
+
+1. Push and create a Pull Request against <base-branch> (I'll give you the exact commands)
+2. Keep the branch as-is (I'll handle it later)
+
+Which option?
+```
+
+Option 1 here runs the Option 2 steps below.
+
 Present the menu exactly as written — concise, with every option coming
 from the list above. Discarding the work happens only in response to your
 human partner explicitly asking for it (see "If your human partner asks to
@@ -86,6 +107,9 @@ is theirs.
 ## Step 5: Execute Choice
 
 ### Option 1: Merge Locally
+
+Never in a human-merge repo: it has no Option 1, and `git merge`, `gh pr merge` or a direct
+push to the base or default branch is never a fallback there.
 
 ```bash
 # Get main repo root for CWD safety
@@ -124,6 +148,11 @@ git push -u origin <feature-branch>
 # From a detached HEAD, name the new branch on the remote:
 # git push origin HEAD:refs/heads/<new-branch>
 ```
+
+In a foreman-managed repo, close-out goes through the board instead (the `foreman` skill's
+`ask push` and `ask open_pr`); report those requests rather than these commands. In a
+human-merge repo the PR is the end of the work: report its URL and that it waits for a
+person to merge it on GitHub.
 
 Then create the pull/merge request against <base-branch> with the forge's
 tooling — its CLI if one is available (e.g. `gh pr create --base
