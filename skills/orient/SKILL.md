@@ -9,7 +9,7 @@ description: "Coordinator start-of-session assessment, including when resuming a
 
 Give a brief assessment from live reads, then recommend one next step. On **every invocation**, including a resumed conversation, re-read the sources below; earlier context and handoffs are leads, not evidence.
 
-Read-only: no dispatch, pane input, ticket edits, board events/requests, fetches, commits, pushes, service starts or repairs. Recommend actions; wait for the user's answer before switching to another workflow. REQUIRED: read the `foreman` skill for tracker precedence and read/configuration semantics; do not use its sender here.
+Read-only (except the capture-only ticket filing that step 5 allows): no dispatch, pane input, ticket edits, board events/requests, fetches, commits, pushes, service starts or repairs. Recommend actions; wait for the user's answer before switching to another workflow. REQUIRED: read the `foreman` skill for tracker precedence and read/configuration semantics; do not use its sender here.
 
 ## Gather
 
@@ -23,6 +23,8 @@ Read-only: no dispatch, pane input, ticket edits, board events/requests, fetches
    ```
 
    `ls` without `--overlay` in a ticket checkout is local, not a board health check. Inspect output as well as exit status: CLI warnings can exit zero. The installed CLI may have no `requests`/`inbox` verb: read the rendered `/needs-you` page instead. Use the main pending-request list, not the duplicate drawer or Recent outcomes. Preserve its oldest-first order (check timestamps); report each request's ID/link, ticket, kind, age and decision/action needed. If a read fails, Needs you is **unknown**, not zero.
+
+   On macOS there is no systemd: one launchd agent runs web and worker together (`FOREMAN_ROLE=all`), and planning sessions use the user's default tmux server. Read `launchctl print "gui/$(id -u)/com.ryanpaulmessner.foreman"` (state, pid, runs, last exit code) instead of `systemctl`, report web and worker as that one agent, and tmux as the default server's `tmux list-sessions`. For a confirmed stopped agent, give `launchctl kickstart -k "gui/$(id -u)/com.ryanpaulmessner.foreman"` as a command for the user, never execute it; its log is `~/Library/Logs/foreman/board.log`.
 
    Report web, worker and tmux separately from HTTP/API reachability. For a confirmed inactive unit, give `systemctl --user start <unit>` as a command for the user, never execute it. If units are active but the URL fails, report the mismatch and suggest checking the configured URL/logs, not restarting blindly. If systemd is inaccessible, unit state is unknown. Finish with a status for all four checks and a pending count or explicit gap.
 
@@ -55,6 +57,8 @@ Read-only: no dispatch, pane input, ticket edits, board events/requests, fetches
 
    Use the last command for each branch with an upstream, substituting the observed refs. Summarize ahead counts per repo **and branch**; do not sum overlapping branch histories. No upstream, gone upstream, detached HEAD or failed read means publication status unknown, not zero. Counts are against locally cached remote refs; do not fetch to refresh them. The user pushes. Finish with every scoped repo accounted for and that freshness caveat.
 
+5. **Repo extras.** For each main checkout in scope, if `<repo>/.agents/orient.md` exists, read it and run its checks (for example an external request queue that feeds the repo's tickets). The one write an extras file may allow is filing capture-only tickets (`foreman new`) for external items with no local ticket; it never allows status changes, closes or other writes. Report what each extras file found and every ticket it filed. A failed extras read is unknown, not empty.
+
 ## If foreman is unavailable
 
 Continue with tmux, git and `ready-repos.py`: file `foreman ls --json`, `show` and `ready` work offline from each checkout without `--overlay`. Use live report files and pane output for what they actually establish. Board stages, inbox and review status remain unknown where no current source confirms them. Do not substitute remembered board state or an empty failed read. Report the failure and recovery suggestion alongside the partial assessment.
@@ -68,6 +72,7 @@ Use these short sections; no raw JSON or full backlog dump:
 - **In flight:** ticket → server/session/window, state; reports needing review/commit.
 - **Frontier:** repo → epic groups and counts, a few candidate IDs; distinguish in-flight exclusions and incomplete scans.
 - **Unpushed:** repo/branch ahead counts, unknowns, cached-ref caveat.
+- **Repo extras** (only when an extras file exists): its findings and the tickets it filed.
 - **Next:** one recommended action with a reason. Prefer unblocking a human decision or closing out a report before another build; otherwise pick ready work with its dependency payoff.
 
 Done when every section has fresh evidence or an explicit unknown, and the answer ends with one recommendation rather than taking action. This is a current assessment, not `handoff`'s summary of the preceding conversation.
