@@ -2,7 +2,7 @@
 id: sk-bso
 title: "devserve: tmux backend on Linux and macOS, template-cloned preview DBs, optional Caddy URLs"
 type: feature
-status: in_progress
+status: closed
 priority: 2
 parent: null
 blocked_by: []
@@ -11,8 +11,8 @@ supersedes: []
 discovered_from: null
 labels: []
 created: 2026-10-19
-closed: null
-close_reason: null
+closed: 2026-10-20
+close_reason: "770dfe2 pushed to origin/main (Ryan, card 616c02c6); review r2 clean. Open: Linux run, live ReportSystem check after #352."
 ---
 
 ## What to build
