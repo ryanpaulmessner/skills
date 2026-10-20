@@ -9,6 +9,7 @@ stateDiagram-v2
     stopped --> starting: up / prepare, launch
     failed --> starting: up / prepare, launch
     running --> running: up / none
+    starting --> starting: up / none
     starting --> running: ready / none
     starting --> failed: error / rollback
     running --> failed: error / terminate
@@ -27,7 +28,7 @@ stateDiagram-v2
 | absent | error | invalid | none |
 | absent | down | invalid | none |
 | absent | drop | invalid | none |
-| starting | up | invalid | none |
+| starting | up | starting | none |
 | starting | ready | running | none |
 | starting | error | failed | rollback |
 | starting | down | stopped | terminate, rollback |
@@ -47,3 +48,18 @@ stateDiagram-v2
 | stopped | error | invalid | none |
 | stopped | down | stopped | none |
 | stopped | drop | absent | drop |
+
+## How states are recorded and observed
+
+The launcher in the preview's tmux window applies these transitions and records each state in the
+state file. `ls` corrects the recorded state with what exists:
+
+| Recorded | Window and pane process alive | TCP listener | Reported |
+|---|---|---|---|
+| starting | yes | no | starting |
+| running | yes | yes | running |
+| running | yes | no | failed |
+| starting | no | no | stopped |
+| running | no | no | stopped |
+| failed | no | no | failed |
+| stopped | no | no | stopped |

@@ -1,34 +1,218 @@
 #!/usr/bin/env python3
-"""Worktree previews; Python stdlib, systemd user services and PostgreSQL tools."""
+"""Worktree previews in tmux windows; Python 3.9+ stdlib, tmux and PostgreSQL tools."""
 import argparse
-import base64
+import contextlib
 import fcntl
 import getpass
 import hashlib
 import json
 import os
 import re
-import shlex
 import signal
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
-import tomllib
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
+
+SESSION = 'devserve'
+PUBLIC = ('unit', 'app', 'worktree', 'branch', 'port', 'url', 'database', 'owner', 'state', 'missing')
+PG_KEYS = ('PGHOST', 'PGPORT', 'PGUSER', 'PGPASSWORD')
+RESERVED = ('PORT', 'DATABASE_URL', 'PREVIEW')
+DB_NAME = r'[a-zA-Z_][a-zA-Z0-9_]{0,62}'
+STAGING_SUFFIX = '_next'
+RETIRED_SUFFIX = '_prev'
+
+
+# apps.toml needs only: top-level keys, [[array-of-tables]], strings, integers, booleans, arrays
+# (multi-line allowed) and inline tables. Anything else is an error, so behaviour cannot drift
+# between Python 3.9 (no tomllib) and newer interpreters.
+
+class _Toml:
+    ESCAPES = {'b': '\b', 't': '\t', 'n': '\n', 'f': '\f', 'r': '\r', '"': '"', '\\': '\\'}
+
+    def __init__(self, text):
+        self.text, self.i = text.replace('\r\n', '\n'), 0
+
+    def fail(self, message):
+        raise ValueError(f'apps.toml line {self.text.count(chr(10), 0, self.i) + 1}: {message}')
+
+    def peek(self, size=1):
+        return self.text[self.i:self.i + size]
+
+    def blank(self, newlines):
+        while self.i < len(self.text):
+            char = self.text[self.i]
+            if char in ' \t':
+                self.i += 1
+            elif char == '#':
+                end = self.text.find('\n', self.i)
+                self.i = len(self.text) if end < 0 else end
+            elif char == '\n' and newlines:
+                self.i += 1
+            else:
+                return
+
+    def end_of_line(self):
+        self.blank(False)
+        if self.i < len(self.text):
+            if self.peek() != '\n':
+                self.fail('expected end of line')
+            self.i += 1
+
+    def key(self):
+        if self.peek() in ('"', "'"):
+            key = self.string()
+        else:
+            match = re.compile(r'[A-Za-z0-9_-]+').match(self.text, self.i)
+            if not match:
+                self.fail('expected a key')
+            self.i, key = match.end(), match.group()
+        self.blank(False)
+        if self.peek() == '.':
+            self.fail('dotted keys are not supported')
+        return key
+
+    def parse(self):
+        root = current = {}
+        while True:
+            self.blank(True)
+            if self.i >= len(self.text):
+                return root
+            if self.peek(2) == '[[':
+                self.i += 2
+                self.blank(False)
+                name = self.key()
+                if self.peek(2) != ']]':
+                    self.fail('expected ]]')
+                self.i += 2
+                tables = root.setdefault(name, [])
+                if not isinstance(tables, list) or (tables and not isinstance(tables[0], dict)):
+                    self.fail(f'{name} is not an array of tables')
+                current = {}
+                tables.append(current)
+                self.end_of_line()
+                continue
+            if self.peek() == '[':
+                self.fail('only [[apps]] tables are supported')
+            name = self.key()
+            if self.peek() != '=':
+                self.fail('expected =')
+            self.i += 1
+            self.blank(False)
+            value = self.value()
+            if name in current:
+                self.fail(f'duplicate key {name}')
+            current[name] = value
+            self.end_of_line()
+
+    def string(self):
+        quote_char = self.peek()
+        if self.peek(3) == quote_char * 3:
+            self.fail('multi-line strings are not supported')
+        self.i += 1
+        out = []
+        while True:
+            if self.i >= len(self.text) or self.peek() == '\n':
+                self.fail('unterminated string')
+            char = self.text[self.i]
+            self.i += 1
+            if char == quote_char:
+                return ''.join(out)
+            if char == '\\' and quote_char == '"':
+                code = self.peek()
+                if code in self.ESCAPES:
+                    out.append(self.ESCAPES[code])
+                    self.i += 1
+                elif code in ('u', 'U'):
+                    size = 4 if code == 'u' else 8
+                    digits = self.text[self.i + 1:self.i + 1 + size]
+                    if not re.fullmatch('[0-9A-Fa-f]{%d}' % size, digits):
+                        self.fail('invalid unicode escape')
+                    out.append(chr(int(digits, 16)))
+                    self.i += 1 + size
+                else:
+                    self.fail('invalid escape')
+            else:
+                out.append(char)
+
+    def value(self):
+        char = self.peek()
+        if char in ('"', "'"):
+            return self.string()
+        if char == '[':
+            self.i += 1
+            items = []
+            while True:
+                self.blank(True)
+                if self.peek() == ']':
+                    self.i += 1
+                    return items
+                items.append(self.value())
+                self.blank(True)
+                if self.peek() == ',':
+                    self.i += 1
+                elif self.peek() != ']':
+                    self.fail('expected , or ]')
+        if char == '{':
+            self.i += 1
+            table = {}
+            self.blank(False)
+            if self.peek() == '}':
+                self.i += 1
+                return table
+            while True:
+                self.blank(False)
+                name = self.key()
+                if self.peek() != '=':
+                    self.fail('expected =')
+                self.i += 1
+                self.blank(False)
+                if name in table:
+                    self.fail(f'duplicate key {name}')
+                table[name] = self.value()
+                self.blank(False)
+                if self.peek() == ',':
+                    self.i += 1
+                elif self.peek() == '}':
+                    self.i += 1
+                    return table
+                else:
+                    self.fail('expected , or } (inline tables stay on one line)')
+        match = re.compile(r'(true|false)(?![A-Za-z0-9_])|[+-]?(0|[1-9](_?[0-9])*)(?![0-9A-Za-z_.:-])').match(
+            self.text, self.i)
+        if not match:
+            self.fail('unsupported value (strings, integers, booleans, arrays, inline tables only)')
+        self.i = match.end()
+        word = match.group()
+        return word == 'true' if word in ('true', 'false') else int(word.replace('_', ''))
+
+
+def parse_toml(text):
+    return _Toml(text).parse()
+
+
+
+def argv_list(value):
+    return isinstance(value, list) and value and all(isinstance(v, str) and v and '\0' not in v for v in value)
 
 
 def load_config(path):
-    with open(path, 'rb') as handle:
-        config = tomllib.load(handle)
-    if set(config) != {'apps'} or not isinstance(config['apps'], list):
-        raise ValueError('config requires [[apps]]')
+    config = parse_toml(Path(path).read_text(encoding='utf-8'))
+    if set(config) - {'apps', 'tmux_socket'} or not isinstance(config.get('apps'), list):
+        raise ValueError('config requires [[apps]] and allows only tmux_socket at top level')
+    warnings = config['warnings'] = []
+    socket_name = config.setdefault('tmux_socket', '')
+    if not isinstance(socket_name, str) or not re.fullmatch(r'[A-Za-z0-9_./-]*', socket_name):
+        raise ValueError('tmux_socket must be a socket name or path')
     apps = config['apps']
     seen = set()
-    allowed = {'name', 'path', 'ports', 'start', 'env_file', 'env', 'data',
-               'source_database', 'migrate', 'seed', 'main_units'}
+    allowed = {'name', 'path', 'ports', 'start', 'env_file', 'env', 'data', 'source_database',
+               'template_database', 'migrate', 'seed', 'main_units', 'timeout', 'extra_ports',
+               'env_file_export'}
     for app in apps:
         if not isinstance(app, dict) or set(app) - allowed:
             raise ValueError('unknown app fields')
@@ -48,31 +232,160 @@ def load_config(path):
         if (not isinstance(ports, list) or len(ports) != 2 or
                 any(type(p) is not int for p in ports) or not 1024 <= ports[0] <= ports[1] <= 65535):
             raise ValueError(f'{name}: ports must be [first, last], 1024..65535')
-        if app.get('data') not in ('copy', 'fresh'):
-            raise ValueError(f'{name}: data must be copy or fresh')
-        source = app.get('source_database', '')
-        if app['data'] == 'copy' and (not isinstance(source, str) or not re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]{0,62}', source)):
-            raise ValueError(f'{name}: source_database must be a database name, not a URL')
-        for key in ('start', 'migrate') + (('seed',) if app['data'] == 'fresh' else ()):
+        data = app.get('data')
+        if data not in ('copy', 'fresh', 'template'):
+            raise ValueError(f'{name}: data must be copy, fresh or template')
+        for key in ('source_database', 'template_database'):
             value = app.get(key)
-            if not isinstance(value, list) or not value or any(not isinstance(v, str) or not v or '\0' in v for v in value):
+            needed = (key == 'source_database' and data == 'copy') or (key == 'template_database' and data == 'template')
+            if value is None and not needed:
+                continue
+            limit = 63 - max(len(STAGING_SUFFIX), len(RETIRED_SUFFIX)) if key == 'template_database' else 63
+            if not isinstance(value, str) or not re.fullmatch(DB_NAME, value) or len(value) > limit:
+                raise ValueError(f'{name}: {key} must be a database name (not a URL), up to {limit} characters')
+        if data == 'template' and app.get('source_database') == app['template_database']:
+            raise ValueError(f'{name}: template_database and source_database must differ')
+        for key in ('start', 'migrate') + (('seed',) if data == 'fresh' else ()):
+            if not argv_list(app.get(key)):
                 raise ValueError(f'{name}: {key} must be a nonempty argv array')
+        timeout = app.setdefault('timeout', 120)
+        if type(timeout) is not int or not 10 <= timeout <= 3600:
+            raise ValueError(f'{name}: timeout must be 10..3600 seconds')
+        if type(app.setdefault('env_file_export', True)) is not bool:
+            raise ValueError(f'{name}: env_file_export must be true or false')
         env = app.setdefault('env', {})
         if not isinstance(env, dict) or any(
                 not re.fullmatch(r'[A-Z_][A-Z0-9_]*', k) or not isinstance(v, str) or
-                any(c in v for c in '\n\r\0') or k in ('PORT', 'DATABASE_URL', 'PREVIEW') or
+                any(c in v for c in '\n\r\0') or k in RESERVED or
                 k.startswith(('DEVSERVE_', 'PG', 'NOTIFY_')) or
                 any(word in k for word in ('PASSWORD', 'SECRET', 'TOKEN', 'KEY'))
                 for k, v in env.items()):
             raise ValueError(f'{name}: env must contain plain, non-reserved variables; use env_file for secrets')
+        extra = app.setdefault('extra_ports', [])
+        if (not isinstance(extra, list) or len(extra) > 8 or len(set(extra)) != len(extra) or any(
+                not isinstance(k, str) or not re.fullmatch(r'[A-Z_][A-Z0-9_]*', k) or k in RESERVED or
+                k.startswith('DEVSERVE_') or k in env for k in extra)):
+            raise ValueError(f'{name}: extra_ports must be distinct, non-reserved variable names')
         units = app.setdefault('main_units', [])
-        if not isinstance(units, list) or any(not isinstance(u, str) or not re.fullmatch(r'[a-zA-Z0-9_.@-]+\.service', u) for u in units):
-            raise ValueError(f'{name}: main_units must be service names')
+        if not isinstance(units, list) or not all(isinstance(u, str) for u in units):
+            raise ValueError(f'{name}: main_units must be strings')
+        for unit in list(units):
+            port = re.fullmatch(r'tcp:([0-9]{4,5})', unit)
+            if (port and 1024 <= int(port.group(1)) <= 65535) or re.fullmatch(r'tmux:[A-Za-z0-9_.:@%=+-]+', unit):
+                continue
+            if re.fullmatch(r'[a-zA-Z0-9_.@-]+\.service', unit):
+                units.remove(unit)
+                warnings.append(f'{name}: main_units entry {unit} skipped: systemd units are no longer supported; '
+                                'use tcp:<port> or tmux:<target>')
+                continue
+            raise ValueError(f'{name}: main_units entries must be tcp:<port> or tmux:<target>')
     for i, app in enumerate(apps):
         for other in apps[i + 1:]:
             if max(app['ports'][0], other['ports'][0]) <= min(app['ports'][1], other['ports'][1]):
                 raise ValueError(f'overlapping ports: {app["name"]} and {other["name"]}')
-    return apps
+    return config
+
+
+# env_file values live only in the memory of the process that needs them (the CLI for database
+# tools, the pane launcher for the app) and in its children's environment. Never in os.environ of
+# the CLI (which may start the tmux server), argv, tmux, the state file or error messages.
+
+def read_env_file(path):
+    """Parse a dotenv subset. Returns (values, dynamic keys); errors name lines, never values."""
+    status = os.stat(path)
+    if status.st_uid != os.getuid() or status.st_mode & 0o077:
+        raise ValueError(f'env_file {path} must be owned by you with mode 0600 (chmod 600)')
+    values, dynamic = {}, set()
+    for number, raw in enumerate(Path(path).read_text(encoding='utf-8').splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('export '):
+            line = line[7:].lstrip()
+        match = re.match(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*', line)
+        if not match:
+            raise ValueError(f'env_file line {number}: expected KEY=VALUE')
+        key, rest = match.group(1), line[match.end():]
+        if rest[:1] == "'":
+            end = rest.find("'", 1)
+            if end < 0:
+                raise ValueError(f'env_file line {number}: unterminated quote')
+            value, tail = rest[1:end], rest[end + 1:]
+        elif rest[:1] == '"':
+            chars, index = [], 1
+            while index < len(rest) and rest[index] != '"':
+                if rest[index] == '\\' and index + 1 < len(rest):
+                    index += 1
+                    chars.append({'n': '\n', 't': '\t', 'r': '\r'}.get(rest[index], rest[index]))
+                else:
+                    chars.append(rest[index])
+                index += 1
+            if index >= len(rest):
+                raise ValueError(f'env_file line {number}: unterminated quote')
+            value, tail = ''.join(chars), rest[index + 1:]
+            if '$' in rest[1:index] or '`' in rest[1:index]:
+                dynamic.add(key)
+        else:
+            value, tail = re.split(r'\s+#', rest, maxsplit=1)[0].strip(), ''
+            if '$' in value or '`' in value:
+                dynamic.add(key)
+        if tail.strip() and not tail.strip().startswith('#'):
+            raise ValueError(f'env_file line {number}: unexpected text after the value')
+        values[key] = value
+    return values, dynamic
+
+
+def secret_env(app):
+    """(tool_env, exported): PG* for database tools, and what the app receives from env_file."""
+    if not app.get('env_file'):
+        return {}, {}
+    values, dynamic = read_env_file(app['env_file'])
+    reserved = sorted(k for k in values if k.startswith('DEVSERVE_'))
+    if reserved:
+        raise ValueError(f'{app["name"]}: env_file must not set {", ".join(reserved)}')
+    tools = {k: values[k] for k in PG_KEYS if k in values}
+    if not {'PGUSER', 'PGPASSWORD'} & set(tools) and 'DATABASE_URL' in values:
+        if 'DATABASE_URL' in dynamic:
+            raise ValueError(f'{app["name"]}: env_file DATABASE_URL must be a literal URL')
+        try:
+            url = urlsplit(values['DATABASE_URL'])
+            parsed = dict(PGUSER=url.username and unquote(url.username), PGPASSWORD=url.password and unquote(url.password),
+                          PGHOST=url.hostname, PGPORT=url.port and str(url.port))
+        except ValueError:
+            raise ValueError(f'{app["name"]}: env_file DATABASE_URL is not a valid URL') from None
+        tools = dict({k: v for k, v in parsed.items() if v}, **tools)
+    exported = {}
+    if app['env_file_export']:
+        if dynamic:
+            raise ValueError(f'{app["name"]}: env_file values for {", ".join(sorted(dynamic))} use substitution; '
+                             'set env_file_export = false and let the app load its own env file')
+        exported = values
+    return tools, exported
+
+
+def app_environment(meta, tools, exported, base=None):
+    env = dict(os.environ if base is None else base)
+    env.update(exported)
+    env.update(meta['config']['env'])
+    user = quote(tools.get('PGUSER') or env.get('PGUSER') or getpass.getuser(), safe='')
+    password = tools.get('PGPASSWORD') or env.get('PGPASSWORD') or ''
+    host = tools.get('PGHOST') or env.get('PGHOST') or 'localhost'
+    if ':' in host and not host.startswith('['):
+        host = '[' + host + ']'
+    login = user + (':' + quote(password, safe='') if password else '')
+    port = tools.get('PGPORT') or env.get('PGPORT') or '5432'
+    env['DATABASE_URL'] = f'postgresql://{login}@{host}:{port}/{meta["database"]}'
+    env.update(PORT=str(meta['port']), PREVIEW='1')
+    for offset, key in enumerate(meta['config'].get('extra_ports', []), 1):
+        env[key] = str(meta['port'] + offset)
+    for key in [k for k in env if k.startswith('DEVSERVE_')]:
+        del env[key]
+    return env
+
+
+def tool_environment(tools):
+    return dict(os.environ, **tools)
+
 
 
 def names(app, worktree):
@@ -82,18 +395,39 @@ def names(app, worktree):
     return f'devserve-{app}-{slug}-{suffix}.service', f'{app}_preview_{slug}_{suffix}'
 
 
-def choose_port(ports, claimed):
-    for port in range(ports[0], ports[1] + 1):
-        if port in claimed:
-            continue
+def window_name(unit):
+    return unit[:-len('.service')]
+
+
+def port_free(port):
+    with socket.socket(socket.AF_INET6) as sock:
+        sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         try:
-            with socket.socket(socket.AF_INET6) as sock:
-                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-                sock.bind(('::', port))
-                return port
+            sock.bind(('::', port))
         except OSError:
-            continue
+            return False
+    with socket.socket() as sock:
+        try:
+            sock.bind(('0.0.0.0', port))
+        except OSError:
+            return False
+    return not listening(port)
+
+
+def choose_port(ports, claimed, width=1):
+    for first in range(ports[0], ports[1] - width + 2):
+        block = range(first, first + width)
+        if not claimed.intersection(block) and all(port_free(port) for port in block):
+            return first
     raise ValueError('no free port in app range')
+
+
+def listening(port):
+    try:
+        with socket.create_connection(('127.0.0.1', port), timeout=0.2):
+            return True
+    except OSError:
+        return False
 
 
 TRANSITIONS = {
@@ -101,6 +435,7 @@ TRANSITIONS = {
     ('stopped', 'up'): ('starting', ('prepare', 'launch')),
     ('failed', 'up'): ('starting', ('prepare', 'launch')),
     ('running', 'up'): ('running', ()),
+    ('starting', 'up'): ('starting', ()),
     ('starting', 'ready'): ('running', ()),
     ('starting', 'error'): ('failed', ('rollback',)),
     ('running', 'error'): ('failed', ('terminate',)),
@@ -120,125 +455,74 @@ def step(state, event):
         raise ValueError(f'invalid lifecycle event: {state}/{event}') from None
 
 
-def run(argv, **kwargs):
+def observed_state(stored, alive, is_listening):
+    """The recorded lifecycle state corrected by what is actually there."""
+    if not alive:
+        return 'stopped' if stored in ('starting', 'running') else stored
+    if stored == 'running' and not is_listening:
+        return 'failed'
+    return stored
+
+
+def window_alive(entry, windows):
+    window = windows.get(entry.get('window'))
+    return bool(window and window['name'] == window_name(entry['unit']) and window['server'] == entry.get('server')
+                and window['pane_pid'] == entry.get('pane_pid') and not window['dead']
+                and pid_alive(window['pane_pid']))
+
+
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def public(row):
+    return {key: row[key] for key in PUBLIC}
+
+
+
+def run(argv, timeout=120, **kwargs):
     data = kwargs.pop('input', None)
     with subprocess.Popen(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           stdin=subprocess.PIPE if data is not None else subprocess.DEVNULL,
                           start_new_session=True, **kwargs) as process:
         try:
-            stdout, _ = process.communicate(input=data, timeout=120)
+            stdout, _ = process.communicate(input=data, timeout=timeout)
         except BaseException:
             terminate(process)
             raise
         if process.returncode:
-            # Child diagnostics may contain credentials. Journald is not a secret transport.
+            # Child diagnostics may contain credentials; report only the executable and status.
             raise ValueError(f'{Path(argv[0]).name} failed (exit {process.returncode})')
         return stdout.strip()
 
 
-def encode(meta):
-    return base64.urlsafe_b64encode(json.dumps(meta).encode()).decode()
+def copy_stream(stream, output):
+    for chunk in iter(lambda: stream.read1(65536), b''):
+        output.write(chunk)
 
 
-def decode(value):
-    return json.loads(base64.urlsafe_b64decode(value))
-
-
-def properties(unit):
-    output = run(['systemctl', '--user', 'show', unit, '--property=Environment,ActiveState,SubState,StatusText,MainPID'])
-    return dict(line.split('=', 1) for line in output.splitlines() if '=' in line)
-
-
-def registry():
-    output = run(['systemctl', '--user', 'list-units', '--all', '--plain', '--no-legend', 'devserve-*.service'])
-    rows = []
-    for line in output.splitlines():
-        unit = line.split()[0]
-        props = properties(unit)
-        values = dict(item.split('=', 1) for item in shlex.split(props.get('Environment', '')) if '=' in item)
-        if 'DEVSERVE_META' not in values:
-            continue
-        meta = decode(values['DEVSERVE_META'])
-        if names(meta['app'], meta['worktree']) != (unit, meta['database']):
-            raise ValueError('invalid devserve unit metadata')
-        state = props.get('StatusText', '')
-        if props.get('ActiveState') == 'failed':
-            state = 'failed'
-        if state not in ('starting', 'running', 'failed', 'stopped'):
-            state = 'starting'
-        rows.append(dict(meta, state=state, missing=not Path(meta['worktree']).is_dir(),
-                         pid=int(props.get('MainPID', '0'))))
-    return rows
-
-
-def notify(state):
-    address = os.environ.get('NOTIFY_SOCKET')
-    if address:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
-            sock.connect('\0' + address[1:] if address.startswith('@') else address)
-            sock.sendall(f'STATUS={state}'.encode())
-
-
-def sql(statement):
-    return run(['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-d', 'postgres'], input=statement)
-
-
-def ownership(meta):
-    return 'devserve:v1:' + meta['unit'] + ':' + hashlib.sha256(meta['worktree'].encode()).hexdigest()
-
-
-def database_status(meta):
-    database = meta['database']
-    if names(meta['app'], meta['worktree']) != (meta['unit'], database):
-        raise ValueError('invalid database identity')
-    result = sql(f"SELECT COALESCE(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = '{database}';")
-    exists = sql(f"SELECT count(*) FROM pg_database WHERE datname = '{database}';") == '1'
-    if exists and result != ownership(meta):
-        raise ValueError('refusing database not created by devserve')
-    return exists
-
-
-def drop_database(meta):
-    if database_status(meta):
-        sql(f'DROP DATABASE "{meta["database"]}" WITH (FORCE);')
-
-
-def app_environment(meta):
-    env = dict(os.environ)
-    user = quote(env.get('PGUSER', getpass.getuser()), safe='')
-    password = quote(env.get('PGPASSWORD', ''), safe='')
-    host = env.get('PGHOST', 'localhost')
-    if ':' in host and not host.startswith('['):
-        host = '[' + host + ']'
-    env['DATABASE_URL'] = f'postgresql://{user}:{password}@{host}:{env.get("PGPORT", "5432")}/{meta["database"]}'
-    env.update(PORT=str(meta['port']), PREVIEW='1')
-    env.pop('NOTIFY_SOCKET', None)
-    env.pop('DEVSERVE_META', None)
-    return env
-
-
-def prepare(meta):
-    exists = database_status(meta)
-    database = meta['database']
-    if not exists:
-        sql(f'CREATE DATABASE "{database}";')
-        sql(f"COMMENT ON DATABASE \"{database}\" IS '{ownership(meta)}';")
-    try:
-        app = meta['config']
-        if not exists and app['data'] == 'copy':
-            with tempfile.TemporaryDirectory(prefix='devserve-dump-') as directory:
-                dump = str(Path(directory) / 'data.dump')
-                run(['pg_dump', '--format=custom', '--no-owner', '--no-acl', '--file', dump, app['source_database']])
-                run(['pg_restore', '--exit-on-error', '--no-owner', '--no-acl', '--dbname', database, dump])
-        env = app_environment(meta)
-        run(app['migrate'], cwd=meta['worktree'], env=env)
-        if not exists and app['data'] == 'fresh':
-            run(app['seed'], cwd=meta['worktree'], env=env)
-    except BaseException:
-        if not exists:
-            drop_database(meta)
-        raise
-    return not exists
+def run_logged(argv, output, timeout, **kwargs):
+    """Run one of the app's own commands (migrate, seed) with its output in the preview log."""
+    with subprocess.Popen(argv, stdin=subprocess.DEVNULL, stderr=subprocess.STDOUT, start_new_session=True,
+                          stdout=subprocess.PIPE if output else subprocess.DEVNULL, **kwargs) as process:
+        pump = output and threading.Thread(target=copy_stream, args=(process.stdout, output), daemon=True)
+        if pump:
+            pump.start()
+        try:
+            process.wait(timeout=timeout)
+        except BaseException:
+            terminate(process)
+            raise
+        if pump:
+            pump.join(5)
+        if process.returncode:
+            raise ValueError(f'{Path(argv[0]).name} failed (exit {process.returncode})')
 
 
 def terminate(child):
@@ -259,186 +543,607 @@ def terminate(child):
         pass
 
 
+@contextlib.contextmanager
+def signals_blocked():
+    blocked = {signal.SIGTERM, signal.SIGHUP, signal.SIGINT}
+    previous = signal.pthread_sigmask(signal.SIG_BLOCK, blocked)
+    try:
+        yield
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+
+
+
+def default_state_dir():
+    if os.environ.get('DEVSERVE_STATE_DIR'):
+        return Path(os.environ['DEVSERVE_STATE_DIR'])
+    base = os.environ.get('XDG_STATE_HOME') or str(Path.home() / '.local/state')
+    return Path(base) / 'devserve'
+
+
+class Registry:
+    """previews.json: one entry per preview, replaced atomically under state.lock."""
+
+    def __init__(self, root):
+        self.root = Path(root)
+        self.path = self.root / 'previews.json'
+
+    def ensure(self):
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if self.root.stat().st_mode & 0o077:
+            raise ValueError(f'state directory {self.root} must be private (chmod 700)')
+        (self.root / 'logs').mkdir(mode=0o700, exist_ok=True)
+
+    def log_path(self, unit):
+        return self.root / 'logs' / (window_name(unit) + '.log')
+
+    @contextlib.contextmanager
+    def locked(self, name='state.lock'):
+        self.ensure()
+        with signals_blocked() if name == 'state.lock' else contextlib.nullcontext(), \
+                open(self.root / name, 'a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            yield
+
+    def read(self):
+        try:
+            data = json.loads(self.path.read_text())
+        except FileNotFoundError:
+            return {}
+        previews = data.get('previews') if isinstance(data, dict) and data.get('version') == 1 else None
+        if not isinstance(previews, dict):
+            raise ValueError('invalid devserve state file')
+        for unit, entry in previews.items():
+            if (not isinstance(entry, dict) or entry.get('unit') != unit or not isinstance(entry.get('worktree'), str)
+                    or names(entry.get('app', ''), entry['worktree']) != (unit, entry.get('database'))):
+                raise ValueError('invalid devserve state entry')
+        return previews
+
+    def write(self, previews):
+        handle, temp = tempfile.mkstemp(dir=self.root, prefix='.previews-')
+        try:
+            with os.fdopen(handle, 'w') as out:
+                json.dump(dict(version=1, previews=previews), out, sort_keys=True, indent=1)
+                out.flush()
+                os.fsync(out.fileno())
+            os.replace(temp, self.path)
+        except BaseException:
+            Path(temp).unlink(missing_ok=True)
+            raise
+
+    def put(self, entry):
+        with self.locked():
+            previews = self.read()
+            previews[entry['unit']] = entry
+            self.write(previews)
+
+    def update(self, unit, **fields):
+        with self.locked():
+            previews = self.read()
+            if unit not in previews:
+                raise ValueError('unknown preview')
+            previews[unit].update(fields)
+            self.write(previews)
+            return dict(previews[unit])
+
+    def remove(self, unit):
+        with self.locked():
+            previews = self.read()
+            previews.pop(unit, None)
+            self.write(previews)
+        self.log_path(unit).unlink(missing_ok=True)
+
+
+
+class Tmux:
+    FORMAT = '#{window_id}\t#{window_name}\t#{pane_pid}\t#{pane_dead}\t#{pid}'
+
+    def __init__(self, socket_name):
+        self.base = ['tmux']
+        if socket_name:
+            self.base += ['-S', socket_name] if '/' in socket_name else ['-L', socket_name]
+
+    @staticmethod
+    def environment():
+        # Without -L/-S, tmux would follow the caller's $TMUX; previews belong on the default server.
+        return {k: v for k, v in os.environ.items() if k != 'TMUX'}
+
+    def __call__(self, *args):
+        return run(self.base + list(args), timeout=30, env=self.environment())
+
+    def windows(self):
+        try:
+            output = self('list-windows', '-t', '=' + SESSION, '-F', self.FORMAT)
+        except ValueError:
+            return {}  # no server or no devserve session
+        windows = {}
+        for line in output.splitlines():
+            window, name, pane_pid, dead, server = line.split('\t')
+            windows[window] = dict(name=name, pane_pid=int(pane_pid), dead=dead == '1', server=int(server))
+        return windows
+
+    def launch(self, name, argv):
+        try:
+            self('has-session', '-t', '=' + SESSION)
+            output = self('new-window', '-d', '-P', '-F', self.FORMAT, '-t', '=' + SESSION + ':', '-n', name, '--', *argv)
+        except ValueError:
+            output = self('new-session', '-d', '-P', '-F', self.FORMAT, '-s', SESSION, '-n', name, '--', *argv)
+        window, _, pane_pid, _, server = output.splitlines()[0].split('\t')
+        for option in ('remain-on-exit on', 'automatic-rename off', 'allow-rename off'):
+            with contextlib.suppress(ValueError):  # the pane may already have exited
+                self('set-option', '-w', '-t', window, *option.split())
+        return window, int(pane_pid), int(server)
+
+    def kill(self, entry, windows):
+        window = windows.get(entry.get('window'))
+        if window and window['name'] == window_name(entry['unit']) and window['server'] == entry.get('server'):
+            with contextlib.suppress(ValueError):
+                self('kill-window', '-t', entry['window'])
+
+    def pane_active(self, target):
+        try:
+            return self('display-message', '-p', '-t', target, '#{pane_dead}') == '0'
+        except ValueError:
+            return False
+
+
+
+def sql(statement, tools):
+    return run(['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-d', 'postgres'], input=statement,
+               env=tool_environment(tools))
+
+
+def ownership(meta):
+    return 'devserve:v1:' + meta['unit'] + ':' + hashlib.sha256(meta['worktree'].encode()).hexdigest()
+
+
+def database_comment(database, tools):
+    """None when the database does not exist, else its comment ('' when unset)."""
+    output = sql("SELECT COALESCE(shobj_description(oid, 'pg_database'), '') || '|' FROM pg_database "
+                 f"WHERE datname = '{database}';", tools)
+    return None if output == '' else output[:-1]
+
+
+def database_status(meta, tools):
+    database = meta['database']
+    if names(meta['app'], meta['worktree']) != (meta['unit'], database):
+        raise ValueError('invalid database identity')
+    comment = database_comment(database, tools)
+    if comment is not None and comment != ownership(meta):
+        raise ValueError('refusing database not created by devserve')
+    return comment is not None
+
+
+def drop_database(meta, tools):
+    if database_status(meta, tools):
+        sql(f'DROP DATABASE "{meta["database"]}" WITH (FORCE);', tools)
+
+
+def orphan_identity(app, database, comment):
+    """Rebuild a preview's identity from its database name and ownership comment, or None."""
+    name = re.fullmatch(re.escape(app) + r'_preview_([a-z0-9_]{1,20})_([a-f0-9]{12})', database)
+    if not name:
+        return None
+    unit = f'devserve-{app}-{name.group(1)}-{name.group(2)}.service'
+    owner = re.fullmatch('devserve:v1:' + re.escape(unit) + ':([a-f0-9]{64})', comment)
+    if not owner or not owner.group(1).startswith(name.group(2)):
+        return None
+    return dict(unit=unit, database=database, worktree_hash=owner.group(1))
+
+
+def owned_databases(tools):
+    output = sql("SELECT datname || '|' || shobj_description(oid, 'pg_database') FROM pg_database "
+                 "WHERE shobj_description(oid, 'pg_database') LIKE 'devserve:v1:%';", tools)
+    return [line.split('|', 1) for line in output.splitlines()]
+
+
+def drop_orphan(app, database, tools):
+    """Drop a preview database known only by its name and comment, re-checking both first."""
+    if orphan_identity(app, database, database_comment(database, tools) or '') is None:
+        raise ValueError(f'refusing database {database}: not created by devserve')
+    sql(f'DROP DATABASE "{database}" WITH (FORCE);', tools)
+
+
+def connections(database, tools):
+    return int(sql(f"SELECT count(*) FROM pg_stat_activity WHERE datname = '{database}';", tools))
+
+
+def create_from_template(database, base, tools):
+    if database_comment(base, tools) is None:
+        raise ValueError(f'template database {base} does not exist; run devserve base refresh')
+    count = connections(base, tools)
+    if count:
+        raise ValueError(f'template database {base} has {count} connection(s); disconnect them first')
+    clone_database(database, base, tools)
+
+
+def clone_database(database, template, tools):
+    statement = f'CREATE DATABASE "{database}" TEMPLATE "{template}" STRATEGY FILE_COPY;'
+    if sql("SELECT count(*) FROM pg_settings WHERE name = 'file_copy_method';", tools) == '1':
+        try:  # PostgreSQL 18+: copy-on-write clone where the file system supports it (APFS, XFS, Btrfs)
+            sql('SET file_copy_method = clone;\n' + statement, tools)
+            return
+        except ValueError:
+            if database_comment(database, tools) is not None:
+                raise
+    sql(statement, tools)
+
+
+def copy_database(source, target, tools, timeout):
+    with tempfile.TemporaryDirectory(prefix='devserve-dump-') as directory:
+        dump = str(Path(directory) / 'data.dump')
+        env = tool_environment(tools)
+        run(['pg_dump', '--format=custom', '--no-owner', '--no-acl', '--file', dump, source], env=env, timeout=timeout)
+        run(['pg_restore', '--exit-on-error', '--no-owner', '--no-acl', '--dbname', target, dump], env=env, timeout=timeout)
+
+
+def prepare(meta, tools, exported, output=None):
+    exists = database_status(meta, tools)
+    database = meta['database']
+    app = meta['config']
+    created = False
+    try:
+        if not exists:
+            # A stop signal between CREATE and COMMENT would leave a database devserve refuses to adopt or drop.
+            with signals_blocked():
+                if app['data'] == 'template':
+                    create_from_template(database, app['template_database'], tools)
+                else:
+                    sql(f'CREATE DATABASE "{database}";', tools)
+                sql(f"COMMENT ON DATABASE \"{database}\" IS '{ownership(meta)}';", tools)
+                created = True
+        if created and app['data'] == 'copy':
+            copy_database(app['source_database'], database, tools, app['timeout'])
+        env = app_environment(meta, tools, exported)
+        run_logged(app['migrate'], output, app['timeout'], cwd=meta['worktree'], env=env)
+        if created and app['data'] == 'fresh':
+            run_logged(app['seed'], output, app['timeout'], cwd=meta['worktree'], env=env)
+    except BaseException:
+        if created:
+            drop_database(meta, tools)
+        raise
+    return created
+
+
+def refresh_base(app, dump=False):
+    """Rebuild app's template database from source_database, then swap it in.
+
+    Default: a file-level clone, faithful even to data pg_restore cannot load back (rows that violate a
+    constraint because they were loaded with triggers off); needs the source without connections.
+    dump=True: pg_dump/pg_restore, which works while the source is in use.
+    """
+    if app['data'] != 'template' or not app.get('source_database'):
+        raise ValueError(f'{app["name"]}: base refresh needs data = "template" and source_database')
+    tools, _ = secret_env(app)
+    base, source = app['template_database'], app['source_database']
+    staging, mark = base + STAGING_SUFFIX, 'devserve:base:v1:' + app['name']
+    current = database_comment(base, tools)
+    if current not in (None, mark):
+        raise ValueError(f'refusing to replace {base}: not created by devserve')
+    retired = base + RETIRED_SUFFIX
+    for leftover_name in (staging, retired):
+        leftover = database_comment(leftover_name, tools)
+        if leftover not in (None, mark):
+            raise ValueError(f'refusing to reuse {leftover_name}: not created by devserve')
+        if leftover is not None:
+            sql(f'DROP DATABASE "{leftover_name}" WITH (FORCE);', tools)
+    started = time.monotonic()
+    if not dump:
+        count = connections(source, tools)
+        if count:
+            raise ValueError(f'source database {source} has {count} connection(s); stop them (for example the '
+                             'main dev server) and retry, or use --dump (pg_dump/pg_restore while in use)')
+    with signals_blocked():
+        if dump:
+            sql(f'CREATE DATABASE "{staging}";', tools)
+        else:
+            clone_database(staging, source, tools)
+        sql(f"COMMENT ON DATABASE \"{staging}\" IS '{mark}';", tools)
+    try:
+        if dump:
+            copy_database(source, staging, tools, max(app['timeout'], 3600))
+        if current is not None:
+            count = connections(base, tools)
+            if count:
+                raise ValueError(f'template database {base} has {count} connection(s); disconnect them first')
+        swap = f'ALTER DATABASE "{staging}" RENAME TO "{base}";'
+        if current is not None:  # one transaction: the base name never disappears
+            swap = f'BEGIN;\nALTER DATABASE "{base}" RENAME TO "{retired}";\n{swap}\nCOMMIT;'
+        sql(swap, tools)
+    except BaseException:
+        if database_comment(staging, tools) == mark:
+            sql(f'DROP DATABASE "{staging}" WITH (FORCE);', tools)
+        raise
+    sql(f'ALTER DATABASE "{base}" WITH ALLOW_CONNECTIONS false;', tools)
+    if current is not None:
+        sql(f'DROP DATABASE "{retired}";', tools)
+    print(f'{base} refreshed from {source} in {time.monotonic() - started:.1f}s')
+
+
 class StartupCancelled(Exception):
     pass
 
 
-def worker(meta):
-    state = meta.get('state', 'absent')
+class Output:
+    """Pane and log file; the pane may vanish (tmux server killed), the log stays."""
+
+    def __init__(self, path):
+        self.log = open(path, 'ab', buffering=0)
+        os.chmod(path, 0o600)
+        self.pane = True
+
+    def write(self, data):
+        with contextlib.suppress(OSError, ValueError):
+            self.log.write(data)
+        if self.pane:
+            try:
+                sys.stdout.buffer.write(data)
+                sys.stdout.buffer.flush()
+            except (OSError, ValueError):
+                self.pane = False
+
+    def say(self, message):
+        self.write(f'devserve: {message}\n'.encode())
+
+
+def launcher(root, unit):
+    registry = Registry(root)
+    meta = registry.read()[unit]
+    output = Output(registry.log_path(unit))
+    state = meta['previous']
     child = None
     created = False
     events = []
+    tools = exported = None
 
     def stop_requested(*_):
         if state == 'starting':
             raise StartupCancelled()
         events.append('down')
 
-    signal.signal(signal.SIGTERM, stop_requested)
+    for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        signal.signal(signum, stop_requested)
 
     def transition(event):
-        nonlocal state, child, created
+        nonlocal state, child, created, tools, exported
         state, effects = step(state, event)
         try:
             for effect in effects:
                 if effect == 'prepare':
-                    created = prepare(meta)
+                    output.say(f'preparing database {meta["database"]} ({meta["config"]["data"]})')
+                    tools, exported = secret_env(meta['config'])
+                    created = prepare(meta, tools, exported, output)
                 elif effect == 'launch':
+                    output.say(f'starting on port {meta["port"]}: {" ".join(meta["config"]["start"])}')
                     child = subprocess.Popen(meta['config']['start'], cwd=meta['worktree'],
-                                             env=app_environment(meta), start_new_session=True)
-                elif effect == 'terminate':
+                                             env=app_environment(meta, tools, exported), stdin=subprocess.PIPE,
+                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+                    threading.Thread(target=copy_stream, args=(child.stdout, output), daemon=True).start()
+                elif effect in ('terminate', 'rollback'):
                     terminate(child)
-                elif effect == 'rollback':
-                    terminate(child)
-                    if created:
-                        drop_database(meta)
+                    if effect == 'rollback' and created:
+                        drop_database(meta, tools)
         finally:
-            notify(state)
+            registry.update(unit, state=state)
+            output.say(state)
 
     try:
         transition('up')
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + meta['config']['timeout']
         while state in ('starting', 'running'):
             if events:
                 transition(events.pop(0))
             elif child.poll() is not None:
                 transition('error')
             elif state == 'starting':
-                try:
-                    with socket.create_connection(('127.0.0.1', meta['port']), timeout=0.1):
-                        transition('ready')
-                except OSError:
-                    if time.monotonic() >= deadline:
-                        transition('error')
+                if listening(meta['port']):
+                    transition('ready')
+                elif time.monotonic() >= deadline:
+                    output.say(f'no listener on port {meta["port"]} after {meta["config"]["timeout"]}s')
+                    transition('error')
             time.sleep(0.05)
     except StartupCancelled:
         transition('down')
-    except BaseException:
+    except BaseException as error:
         if state in ('starting', 'running'):
             transition('error')
-        print('devserve: preview setup failed; check commands and database access', file=sys.stderr)
+        reason = str(error) if isinstance(error, ValueError) else type(error).__name__
+        output.say(f'preview setup failed: {reason}')
     finally:
         terminate(child)
+    if state == 'failed':
+        output.say(f'window kept for inspection; run: devserve down {unit} --drop-db')
     return 0
 
 
-def service_command(meta):
-    command = ['systemd-run', '--user', '--quiet', '--expand-environment=no']
-    if meta['config'].get('env_file'):
-        command += ['--property=EnvironmentFile=' + meta['config']['env_file']]
-    command += ['--setenv=DEVSERVE_META=' + encode(meta)]
-    for key, value in meta['config']['env'].items():
-        command += ['--setenv=' + key + '=' + value]
-    command += ['--setenv=PORT=' + str(meta['port']), '--setenv=PREVIEW=1']
-    return command
+class Devserve:
+    def __init__(self, config, root):
+        self.apps = config['apps']
+        self.tmux = Tmux(os.environ.get('DEVSERVE_TMUX_SOCKET', config['tmux_socket']))
+        self.registry = Registry(root)
 
+    def rows(self):
+        windows = self.tmux.windows()
+        rows = []
+        for entry in self.registry.read().values():
+            alive = window_alive(entry, windows)
+            state = observed_state(entry['state'], alive, alive and listening(entry['port']))
+            rows.append(dict(entry, state=state, alive=alive, missing=not Path(entry['worktree']).is_dir()))
+        return rows
 
-def drop_service_database(meta):
-    run(service_command(meta) + ['--wait', '--pipe', '--collect',
-        '--unit=' + meta['unit'].removesuffix('.service') + '-cleanup',
-        sys.executable, str(Path(__file__).resolve()), '_drop'])
+    def find(self, name):
+        row = next((r for r in self.rows() if window_name(r['unit']) == name.removesuffix('.service')), None)
+        if not row:
+            raise ValueError('unknown preview')
+        return row
 
+    def common_dir(self, path):
+        return Path(run(['git', '-C', str(path), 'rev-parse', '--path-format=absolute', '--git-common-dir'])).resolve()
 
-def wait_state(unit, wanted, timeout=150):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        rows = registry()
-        row = next((r for r in rows if r['unit'] == unit), None)
-        if row and row['state'] in wanted:
-            return row
-        time.sleep(0.1)
-    raise ValueError('preview transition timed out; inspect devserve ls/logs')
+    def up(self, worktree):
+        worktree = Path(worktree).resolve()
+        common = self.common_dir(worktree)
+        matches = [app for app in self.apps if self.common_dir(app['path']) == common]
+        if len(matches) != 1:
+            raise ValueError('worktree must match exactly one configured app by git common dir')
+        app = matches[0]
+        unit, database = names(app['name'], worktree)
+        rows = self.rows()
+        existing = next((row for row in rows if row['unit'] == unit), None)
+        initial = existing['state'] if existing else 'absent'
+        target, effects = step(initial, 'up')
+        if not effects:
+            if target == 'running':
+                print(existing['url'])
+                return None
+            return dict(unit=unit, timeout=app['timeout'], launched=False)
+        if existing:
+            self.stop(existing)
+        claimed = {port for row in rows if row['unit'] != unit
+                   for port in range(row['port'], row['port'] + 1 + len(row['config'].get('extra_ports', [])))}
+        port = choose_port(app['ports'], claimed, width=1 + len(app['extra_ports']))
+        meta = dict(app=app['name'], unit=unit, worktree=str(worktree), database=database,
+                    branch=run(['git', '-C', str(worktree), 'rev-parse', '--abbrev-ref', 'HEAD']),
+                    owner=os.environ.get('FOREMAN_SESSION') or getpass.getuser(), port=port,
+                    url=f'http://127.0.0.1:{port}', config=app, state=target, previous=initial)
+        self.registry.put(meta)
+        window, pane_pid, server = self.tmux.launch(
+            window_name(unit), [sys.executable, str(Path(__file__).resolve()), '_launch', str(self.registry.root), unit])
+        self.registry.update(unit, window=window, pane_pid=pane_pid, server=server)
+        return dict(unit=unit, timeout=app['timeout'], launched=True)
 
+    def await_up(self, unit, timeout, launched):
+        """Wait, without devserve.lock, until the preview runs or ends; the launcher owns the transitions."""
+        try:
+            row = self.wait(unit, {'running', 'failed', 'stopped'}, timeout=5 * timeout + 30)
+        except (KeyboardInterrupt, ValueError):
+            if launched:
+                with self.registry.locked('devserve.lock'), contextlib.suppress(ValueError):
+                    self.down(self.find(unit), False)
+            raise
+        if row is None or row['state'] != 'running':
+            self.wait_launcher_exit(unit)
+            raise ValueError(f'preview failed or was stopped: {unit}; use devserve logs {unit}, then down --drop-db')
+        print(row['url'])
 
-def common_dir(path):
-    return Path(run(['git', '-C', str(path), 'rev-parse', '--path-format=absolute', '--git-common-dir'])).resolve()
+    def wait(self, unit, wanted, timeout):
+        """The preview's row once its state is in wanted, or None once it is removed."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            row = next((r for r in self.rows() if r['unit'] == unit), None)
+            if row is None or row['state'] in wanted:
+                return row
+            time.sleep(0.1)
+        raise ValueError('preview transition timed out; inspect devserve ls/logs')
 
+    def wait_launcher_exit(self, unit, timeout=60):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            row = next((r for r in self.rows() if r['unit'] == unit), None)
+            if not row or not row['alive']:
+                return True
+            time.sleep(0.05)
+        return False
 
-def up(apps, worktree):
-    worktree = Path(worktree).resolve()
-    common = common_dir(worktree)
-    matches = [app for app in apps if common_dir(app['path']) == common]
-    if len(matches) != 1:
-        raise ValueError('worktree must match exactly one configured app by git common dir')
-    app = matches[0]
-    unit, database = names(app['name'], worktree)
-    rows = registry()
-    existing = next((row for row in rows if row['unit'] == unit), None)
-    initial = existing['state'] if existing else 'absent'
-    _, effects = step(initial, 'up')
-    if not effects:
-        print(existing['url'])
-        return
-    if existing:
-        run(['systemctl', '--user', 'stop', unit])
-    port = choose_port(app['ports'], {row['port'] for row in rows if row['unit'] != unit})
-    meta = dict(app=app['name'], unit=unit, worktree=str(worktree), database=database,
-                branch=run(['git', '-C', str(worktree), 'rev-parse', '--abbrev-ref', 'HEAD']),
-                owner=os.environ.get('FOREMAN_SESSION') or getpass.getuser(), port=port,
-                url=f'http://127.0.0.1:{port}', config=app, state=initial)
-    run(service_command(meta) + ['--unit=' + unit, '--description=' + unit,
-        '--remain-after-exit', '--service-type=exec', '--property=NotifyAccess=all',
-        '--property=TimeoutStopSec=15', '--working-directory=' + str(worktree),
-        sys.executable, str(Path(__file__).resolve()), '_worker'])
-    try:
-        row = wait_state(unit, {'running', 'failed', 'stopped'})
-    except (KeyboardInterrupt, ValueError):
-        current = next((r for r in registry() if r['unit'] == unit), None)
-        if current:
-            down(current, False)
-        raise
-    if row['state'] != 'running':
-        wait_worker_exit(unit)
-        raise ValueError(f'preview failed: {unit}; use logs, then down --drop-db')
-    print(meta['url'])
+    def stop(self, row):
+        """Stop the launcher (it terminates the app and rolls back), then close its window."""
+        if row['alive']:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(row['pane_pid'], signal.SIGTERM)
+            self.wait_launcher_exit(row['unit'])
+        self.tmux.kill(row, self.tmux.windows())
+        return self.registry.read().get(row['unit'], row)
 
+    def down(self, row, drop):
+        entry = self.stop(row)
+        state = observed_state(entry['state'], False, False)
+        target, _ = step(state, 'down')
+        self.registry.update(row['unit'], state=target)
+        if drop:
+            step(target, 'drop')
+            tools, _ = secret_env(row['config'])
+            drop_database(row, tools)
+            self.registry.remove(row['unit'])
+        print(row['unit'] + (' removed' if drop else ' stopped (database kept)'))
 
-def wait_worker_exit(unit):
-    deadline = time.monotonic() + 30
-    while properties(unit).get('MainPID') != '0':
-        if time.monotonic() > deadline:
-            raise ValueError('worker did not stop')
-        time.sleep(0.05)
+    def gc(self, stopped):
+        failures = []
+        for row in self.rows():
+            try:
+                if row['missing']:
+                    self.down(row, True)
+                elif row['state'] in ('stopped', 'failed') and not row['alive']:
+                    if stopped:
+                        self.down(row, True)
+                    else:
+                        print(f'{row["unit"]} {row["state"]}, database {row["database"]} kept; '
+                              'devserve gc --stopped drops it')
+            except (ValueError, OSError, subprocess.TimeoutExpired) as error:
+                failures.append(f'{row["unit"]}: {error}')
+        for app in self.apps:
+            try:
+                self.gc_orphans(app, stopped)
+            except (ValueError, OSError, subprocess.TimeoutExpired) as error:
+                failures.append(f'{app["name"]} databases: {error}')
+        for failure in failures:
+            print(f'devserve: gc skipped {failure}', file=sys.stderr)
+        if failures:
+            raise ValueError(f'gc could not clean {len(failures)} item(s); see above')
 
+    def gc_orphans(self, app, stopped):
+        """Preview databases with a devserve comment but no state entry, e.g. from the systemd backend."""
+        known = set(self.registry.read())
+        tools, _ = secret_env(app)
+        worktrees = {hashlib.sha256(path.encode()).hexdigest(): path for path in self.worktrees(app)}
+        for database, comment in owned_databases(tools):
+            identity = orphan_identity(app['name'], database, comment)
+            if identity is None or identity['unit'] in known:
+                continue
+            worktree = worktrees.get(identity['worktree_hash'])
+            if worktree is None or stopped:
+                drop_orphan(app['name'], database, tools)
+                print(f'{database} dropped (no state entry; worktree {"kept" if worktree else "gone"})')
+            else:
+                print(f'{identity["unit"]} has no state entry, database {database} kept for {worktree}; '
+                      'devserve gc --stopped drops it')
 
-def down(row, drop):
-    if row['pid']:
-        run(['systemctl', '--user', 'kill', '--kill-whom=main', '--signal=SIGTERM', row['unit']])
-        row = wait_state(row['unit'], {'stopped', 'failed'}, timeout=30)
-        wait_worker_exit(row['unit'])
-    target, _ = step(row['state'], 'down')
-    if not drop and target != row['state']:
-        run(['systemctl', '--user', 'stop', row['unit']])
-        run(['systemd-run', '--user', '--quiet', '--expand-environment=no',
-             '--unit=' + row['unit'], '--description=' + row['unit'],
-             '--remain-after-exit', '--service-type=exec', '--property=NotifyAccess=all',
-             '--setenv=DEVSERVE_META=' + encode(row),
-             sys.executable, str(Path(__file__).resolve()), '_stopped'])
-        wait_state(row['unit'], {target}, timeout=10)
-    if drop:
-        _, effects = step(row['state'], 'drop')
-        if 'drop' in effects:
-            drop_service_database(row)
-        run(['systemctl', '--user', 'stop', row['unit']])
-        subprocess.run(['systemctl', '--user', 'reset-failed', row['unit']], capture_output=True)
-    print(row['unit'] + (' removed' if drop else ' stopped (database kept)'))
+    def worktrees(self, app):
+        output = run(['git', '-C', app['path'], 'worktree', 'list', '--porcelain'])
+        paths = (Path(line[len('worktree '):]) for line in output.splitlines() if line.startswith('worktree '))
+        return [str(path.resolve()) for path in paths if path.is_dir()]
+
+    def mains(self):
+        out = []
+        for app in self.apps:
+            for unit in app['main_units']:
+                kind, target = unit.split(':', 1)
+                active = listening(int(target)) if kind == 'tcp' else self.tmux.pane_active(target)
+                out.append(dict(app=app['name'], unit=unit, state='active' if active else 'inactive'))
+        return out
+
+    def logs(self, target, follow):
+        rows = self.registry.read()
+        unit = next((u for u in rows if window_name(u) == target.removesuffix('.service')), None)
+        if unit:
+            path = self.registry.log_path(unit)
+            path.touch(mode=0o600)
+            argv = ['tail', '-n', '100'] + (['-f'] if follow else []) + [str(path)]
+            os.execvp(argv[0], argv)
+        mains = [u for app in self.apps if app['name'] == target for u in app['main_units'] if u.startswith('tmux:')]
+        if not mains:
+            raise ValueError('unknown preview, or app without tmux main_units')
+        if follow:
+            raise ValueError('follow is only available for previews; attach to the main tmux target instead')
+        for unit in mains:
+            print(self.tmux('capture-pane', '-p', '-J', '-S', '-100', '-t', unit[len('tmux:'):]))
 
 
 def main():
-    if len(sys.argv) == 2 and sys.argv[1] in ('_worker', '_drop', '_stopped'):
-        meta = decode(os.environ['DEVSERVE_META'])
-        if sys.argv[1] == '_stopped':
-            state, _ = step(meta['state'], 'down')
-            notify(state)
-            return 0
-        if sys.argv[1] == '_worker':
-            return worker(meta)
-        drop_database(meta)
-        return 0
+    if len(sys.argv) == 4 and sys.argv[1] == '_launch':
+        return launcher(sys.argv[2], sys.argv[3])
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
-    up_parser = commands.add_parser('up')
-    up_parser.add_argument('worktree', nargs='?', default='.')
+    commands.add_parser('up').add_argument('worktree', nargs='?', default='.')
     commands.add_parser('ls').add_argument('--json', action='store_true')
     logs = commands.add_parser('logs')
     logs.add_argument('target')
@@ -446,50 +1151,49 @@ def main():
     stop = commands.add_parser('down')
     stop.add_argument('preview')
     stop.add_argument('--drop-db', action='store_true')
-    commands.add_parser('gc')
+    commands.add_parser('gc').add_argument('--stopped', action='store_true',
+                                           help='also drop stopped or failed previews and their databases')
+    base = commands.add_parser('base').add_subparsers(dest='action', required=True).add_parser('refresh')
+    base.add_argument('app')
+    base.add_argument('--dump', action='store_true', help='pg_dump/pg_restore instead of a file clone')
     args = parser.parse_args()
-    config = Path(os.environ.get('DEVSERVE_CONFIG_DIR', str(Path.home() / '.config/devserve'))) / 'apps.toml'
-    apps = load_config(config)
+    config_dir = Path(os.environ.get('DEVSERVE_CONFIG_DIR', str(Path.home() / '.config/devserve')))
+    config = load_config(config_dir / 'apps.toml')
+    if not (args.command == 'ls' and args.json):  # foreman parses ls --json with stderr merged into stdout
+        for warning in config['warnings']:
+            print(f'devserve: warning: {warning}', file=sys.stderr)
+    tool = Devserve(config, default_state_dir())
     if args.command == 'logs':
-        targets = [r['unit'] for r in registry() if r['unit'].removesuffix('.service') == args.target.removesuffix('.service')]
-        targets += [u for app in apps if app['name'] == args.target for u in app['main_units']]
-        if not targets:
-            raise ValueError('unknown preview or app')
-        argv = ['journalctl', '--user', '--no-pager', '-n', '100']
-        for target in targets:
-            argv += ['-u', target]
-        if args.follow:
-            argv += ['-f']
-        os.execvp(argv[0], argv)
+        tool.logs(args.target, args.follow)
+        return 0
     if args.command == 'ls':
-        previews = [{k: v for k, v in row.items() if k not in ('config', 'pid')} for row in registry()]
-        mains = [dict(app=app['name'], unit=unit, state=properties(unit).get('ActiveState', 'unknown'))
-                 for app in apps for unit in app['main_units']]
+        rows = [public(row) for row in tool.rows()]
+        mains = tool.mains()
         if args.json:
-            print(json.dumps(dict(previews=previews, main_units=mains), sort_keys=True))
+            print(json.dumps(dict(previews=rows, main_units=mains), sort_keys=True))
         else:
-            for row in previews:
+            for row in rows:
                 print(f'{row["unit"]} app={row["app"]} branch={row["branch"]} port={row["port"]} '
                       f'{row["url"]} owner={row["owner"]} state={row["state"]}' + (' MISSING' if row['missing'] else ''))
             for row in mains:
                 print(f'{row["unit"]} app={row["app"]} main state={row["state"]}')
         return 0
-    runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
-    with open(runtime / 'devserve.lock', 'a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        if args.command == 'up':
-            up(apps, args.worktree)
+    if args.command == 'up':
+        with tool.registry.locked('devserve.lock'):
+            pending = tool.up(args.worktree)
+        if pending:
+            tool.await_up(**pending)
+        return 0
+    with tool.registry.locked('devserve.lock'):
+        if args.command == 'base':
+            app = next((a for a in tool.apps if a['name'] == args.app), None)
+            if not app:
+                raise ValueError('unknown app')
+            refresh_base(app, args.dump)
+        elif args.command == 'gc':
+            tool.gc(args.stopped)
         else:
-            rows = registry()
-            if args.command == 'gc':
-                for row in rows:
-                    if row['missing']:
-                        down(row, True)
-            else:
-                row = next((r for r in rows if r['unit'].removesuffix('.service') == args.preview.removesuffix('.service')), None)
-                if not row:
-                    raise ValueError('unknown preview')
-                down(row, args.drop_db)
+            tool.down(tool.find(args.preview), args.drop_db)
     return 0
 
 

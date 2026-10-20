@@ -29,6 +29,15 @@ def render():
                 lines.append(f'| {state} | {event} | {target} | {", ".join(effects) or "none"} |')
             except ValueError:
                 lines.append(f'| {state} | {event} | invalid | none |')
+    lines += ['', '## How states are recorded and observed', '',
+              'The launcher in the preview\'s tmux window applies these transitions and records each state in the',
+              'state file. `ls` corrects the recorded state with what exists:', '',
+              '| Recorded | Window and pane process alive | TCP listener | Reported |', '|---|---|---|---|']
+    for stored, alive, listening in (('starting', True, False), ('running', True, True), ('running', True, False),
+                                     ('starting', False, False), ('running', False, False),
+                                     ('failed', False, False), ('stopped', False, False)):
+        reported = module.observed_state(stored, alive, listening)
+        lines.append(f'| {stored} | {"yes" if alive else "no"} | {"yes" if listening else "no"} | {reported} |')
     return '\n'.join(lines) + '\n'
 
 
