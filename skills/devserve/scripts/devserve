@@ -1005,7 +1005,7 @@ class Devserve:
         meta = dict(app=app['name'], unit=unit, worktree=str(worktree), database=database,
                     branch=run(['git', '-C', str(worktree), 'rev-parse', '--abbrev-ref', 'HEAD']),
                     owner=os.environ.get('FOREMAN_SESSION') or getpass.getuser(), port=port,
-                    url=f'http://127.0.0.1:{port}', config=app, state=target, previous=initial)
+                    url=f'http://localhost:{port}', config=app, state=target, previous=initial)
         self.registry.put(meta)
         window, pane_pid, server = self.tmux.launch(
             window_name(unit), [sys.executable, str(Path(__file__).resolve()), '_launch', str(self.registry.root), unit])

@@ -193,7 +193,7 @@ main_units = ["tcp:{self.port + 19}"]
 
     def test_copied_preview_lifecycle_and_secret_boundary(self):
         url = self.cli('up', self.trees[0])
-        self.assertTrue(url.startswith('http://127.0.0.1:'), url)
+        self.assertTrue(url.startswith('http://localhost:'), url)
         page = self.page(url)
         self.assertEqual((page['value'], page['preview'], page['secret']), ('copied-data', '1', CANARY))
         self.cli('up', self.trees[1])
@@ -242,7 +242,7 @@ main_units = ["tcp:{self.port + 19}"]
             self.assertIn(row['state'], ('starting', 'running', 'failed', 'stopped'))
             self.assertIsInstance(row['missing'], bool)
             url = urllib.parse.urlsplit(row['url'])
-            self.assertEqual((url.scheme, url.hostname, url.username), ('http', '127.0.0.1', None))
+            self.assertEqual((url.scheme, url.hostname, url.username), ('http', 'localhost', None))
             self.assertTrue(1024 <= url.port <= 65535)
         bin_dir = self.root / 'bin'
         bin_dir.mkdir()
