@@ -133,6 +133,17 @@ one-off tickets included. Report the PR URL and keep the ticket open: forge sync
 parent are not retargeted; leave that to the person on GitHub. Never fall back to `git merge`,
 `gh pr merge` or a direct push.
 
+**Writing a card.** One question per card. Start the question with What / Part of (one-off, or
+the epic) / From (Asana, Support Board T-###, Ryan's note, or "found while doing X") / Why now,
+and give every option an `--option-detail "<option>=<what happens>"`. A card must make sense to
+someone who has not read your session. Withdraw your own stale card with
+`foreman withdraw <request-id> --reason "<why>"`; never leave Ryan a question that no longer applies.
+
+**Card questions.** Ryan can ask about a pending card from the board. The question arrives in your
+session as `[card question <request-id>] <text>`. Answer it on the card, not only in chat:
+`foreman card-reply <request-id> --text "<answer>"` (or `--body-file <md>` for a longer answer).
+The card stays pending; asking is not answering. A card question never changes your task.
+
 ## Project-size specs only
 
 Keep one slug, configured project and spec path through `tight-spec` → `to-tickets`; carry them in
