@@ -452,6 +452,12 @@ mode = "own"
 # --- sk-81s.9: coordinator dispatch ---
 
 [[skill]]
+name = "design-pack"
+job = "spec-diagrams"
+mode = "own"
+from = []
+
+[[skill]]
 name = "orient"
 job = "coordinator-assessment"
 mode = "own"

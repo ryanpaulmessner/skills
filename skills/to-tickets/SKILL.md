@@ -22,6 +22,10 @@ Work from the conversation. If the user passes a reference (a ticket id, a spec 
 body, notes/comments, and children: files use `foreman show <id> --json` and `foreman tree <id> --json`;
 beads use `bd show <id>` and `bd list --parent <id>`.
 
+For a project spec, read its design pack (`<spec-name>.design.md` beside it). If it is missing, stop and
+run the `design-pack` skill, then show the pack to the user before drafting tickets: the user approves
+a spec with its pack, never without. A pack part skipped with a reason is fine.
+
 ## 2. Explore the codebase
 
 If you haven't already, explore enough to know the current state. Use the project's glossary vocabulary
@@ -97,6 +101,9 @@ Build sessions hand ticket proposals to the coordinator rather than allocating i
 
 Avoid file paths and code snippets in tickets — they go stale. Exception: a prototype snippet that pins a
 decision better than prose (state machine, schema, type shape), trimmed and labeled.
+Give each ticket the slice of the design pack it builds: the ER fragment for its tables, the proposed
+transitions it adds, the flow it makes work. Copy the Mermaid block (trimmed to that ticket) and link
+the pack; the builder builds to that shape.
 
 After publishing in either tracker, use the `foreman` skill to send `epic ticket <draft-slug> --project <project> --beads-epic-id <epic-id>` for the draft from `tight-spec`; skip when there is no draft. The legacy flag also accepts file-ticket epic ids.
 

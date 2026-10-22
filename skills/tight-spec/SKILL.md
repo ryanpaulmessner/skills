@@ -116,6 +116,9 @@ highest one possible; fewest seams wins. Confirm the seams with the user.>
 ```
 
 For a project-size spec, save the spec at the draft's spec path and run the builder check in `references/builder-check.md` before handing it over.
+Then run the `design-pack` skill: data, state and flow diagrams beside the spec, drawn from the code. It
+is required for a project spec; a part may be skipped only with a stated reason. Fold any gap the pack
+exposes back into the spec.
 
 ## 5. Gate and hand off
 
@@ -126,8 +129,9 @@ Before asking for approval, you must be able to answer:
 - What evidence will prove the change worked?
 - What action would exceed the spec and require asking first?
 
-Present the spec with a short list of the calls you made. "Sounds good" to an idea is not approval of a
+Present the spec with a short list of the calls you made, and for a project the design pack (one line per
+part on what changes; the board's draft epic page draws it). "Sounds good" to an idea is not approval of a
 spec you haven't shown. Once approved: for a project, ask the user to run `/to-tickets <spec>` (it is user-invoked, so the
 Skill tool cannot start it); for a small change, proceed through the normal workflow.
 
-On project-spec approval, use the `foreman` skill to send `epic approve` (`approve_spec`) with the saved spec path; pass the draft slug, project and path to `to-tickets`.
+On project-spec approval, use the `foreman` skill to send `epic approve` (`approve_spec`) with the saved spec path and `--design <pack path>`; pass the draft slug, project, spec and pack paths to `to-tickets`.

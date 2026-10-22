@@ -13,7 +13,7 @@ Skills marked * are user-invoked. When one is due, name it to the user (`/tight-
 
 ## New nontrivial work
 
-1. `tight-spec`*: goal, non-goals, acceptance checks. Stop for user approval.
+1. `tight-spec`*: goal, non-goals, acceptance checks, then a `design-pack` (data, state and flow diagrams from the code) for a project. Stop for user approval.
 2. `to-tickets`*: approved spec → tracker epic and vertical-slice tickets with blocking edges.
 3. Rundown: your understanding in a few lines. Stop for user pushback.
 4. `implement`*: work the repo's ticket frontier ticket by ticket. `tdd` at seams, `verify-before-claiming` before any done-claim, `code-review` per ticket.
