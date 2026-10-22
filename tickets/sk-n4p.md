@@ -2,7 +2,7 @@
 id: sk-n4p
 title: "Design pack before ticketing: data, state and flow diagrams"
 type: feature
-status: open
+status: closed
 priority: 2
 parent: null
 blocked_by: []
@@ -11,8 +11,8 @@ supersedes: []
 discovered_from: null
 labels: []
 created: 2026-10-22
-closed: null
-close_reason: null
+closed: 2026-10-22
+close_reason: "700aeec design-pack skill + tight-spec/wayfinder/to-tickets/flow; board side fm-44e live"
 ---
 
 From: Ryan, 2026-10-21: before /to-tickets, show database diagrams of the feature and its changes, state diagrams and flow diagrams (especially flows that touch existing state machines), plus design artifacts, so the feature can be reviewed visually before approval and ticketing.
