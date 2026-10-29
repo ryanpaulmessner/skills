@@ -571,3 +571,247 @@ reason = "Phone-browser fixes; current work is desktop-first."
 name = "analyze-sessions"
 job = "session-audit"
 mode = "own"
+
+# --- UX design (Owl-Listener designer-skills, sk-plp) ---
+
+[sources.designer]
+repo = "https://github.com/Owl-Listener/designer-skills"
+path = "~/dev/utils/skill-sources/designer-skills"
+pin = "9a6930cf84a822eb458624bd11c61aac5bbdf224"
+
+[[skill]]
+name = "ux-critique"
+job = "ui-critique"
+mode = "merge"
+from = ["designer:visual-critique/skills/critique-*", "designer:prototyping-testing/skills/heuristic-evaluation"]
+
+[[skill]]
+name = "ux-laws"
+job = "ux-laws"
+mode = "merge"
+from = [
+  "designer:interaction-design/skills/doherty-threshold",
+  "designer:interaction-design/skills/fitts-law",
+  "designer:interaction-design/skills/hicks-law",
+  "designer:interaction-design/skills/jakobs-law",
+  "designer:interaction-design/skills/millers-law",
+  "designer:interaction-design/skills/peak-end-rule",
+  "designer:interaction-design/skills/serial-position-effect",
+  "designer:interaction-design/skills/teslers-law",
+  "designer:interaction-design/skills/zeigarnik-effect",
+  "designer:ui-design/skills/aesthetic-usability",
+  "designer:ui-design/skills/law-of-*",
+  "designer:ui-design/skills/von-restorff-effect",
+]
+
+[[skill]]
+name = "ui-patterns"
+job = "ui-copy-and-states"
+mode = "merge"
+from = ["designer:designer-toolkit/skills/ux-writing", "designer:interaction-design/skills/loading-states", "designer:interaction-design/skills/error-handling-ux", "designer:interaction-design/skills/feedback-patterns"]
+
+[[skill]]
+name = "information-architecture"
+job = "information-architecture"
+mode = "adapt"
+from = ["designer:ux-strategy/skills/information-architecture"]
+
+[[drop]]
+from = "designer:design-ops/skills/*"
+reason = "Design-team operations (critique facilitation, sprints, review gates, handoff specs, design-file versioning); solo dev with no design team. Build-matches-design QA is covered by ux-critique and verify-before-claiming."
+
+[[drop]]
+from = "designer:design-research/skills/*"
+reason = "Participant and product research (interviews, surveys, diaries, personas, card sorts, funnel analytics); no research participants or product analytics to work from."
+
+[[drop]]
+from = "designer:design-systems/skills/*"
+reason = "Design-system authoring and governance (tokens, components, theming, icon/motion systems, docs, localisation, WCAG audits); per-app styling lives in each repo, and UI building is covered by frontend-design, emil-design-eng and animate."
+
+[[drop]]
+from = "designer:designer-toolkit/skills/case-study"
+reason = "Portfolio writing; not a dev workflow."
+
+[[drop]]
+from = "designer:designer-toolkit/skills/design-negotiation"
+reason = "Stakeholder advocacy for a design team; solo dev."
+
+[[drop]]
+from = "designer:designer-toolkit/skills/design-rationale"
+reason = "Decision rationale is covered by tight-spec decisions and ADRs (domain-modeling)."
+
+[[drop]]
+from = "designer:designer-toolkit/skills/design-system-adoption"
+reason = "Org-level design-system rollout; solo dev."
+
+[[drop]]
+from = "designer:designer-toolkit/skills/design-token-audit"
+reason = "Token drift audits for a shared design system; none in use."
+
+[[drop]]
+from = "designer:designer-toolkit/skills/presentation-deck"
+reason = "Design presentations to stakeholders; not a dev workflow."
+
+[[drop]]
+from = "designer:interaction-design/skills/animation-principles"
+reason = "Same job as animate and emil-design-eng."
+
+[[drop]]
+from = "designer:interaction-design/skills/micro-interaction-spec"
+reason = "Same job as animate."
+
+[[drop]]
+from = "designer:interaction-design/skills/interfaces-that-feel"
+reason = "Same job as emil-design-eng (polish and feel)."
+
+[[drop]]
+from = "designer:interaction-design/skills/state-machine"
+reason = "Same job as principles state-machine-skeleton."
+
+[[drop]]
+from = "designer:interaction-design/skills/conversational-ux"
+reason = "Voice/chatbot dialog design; not in the curated core. Revisit when we_go_next's LLM analysis chat is designed."
+
+[[drop]]
+from = "designer:interaction-design/skills/gesture-patterns"
+reason = "Touch/gesture design; our UIs are desktop pointer and in-game."
+
+[[drop]]
+from = "designer:interaction-design/skills/form-design"
+reason = "Not in the curated core (sk-plp); revisit via skills-sync if form-heavy work appears."
+
+[[drop]]
+from = "designer:interaction-design/skills/navigation-patterns"
+reason = "Not in the curated core (sk-plp); revisit via skills-sync."
+
+[[drop]]
+from = "designer:interaction-design/skills/onboarding-design"
+reason = "First-run/activation design for products with signups; not applicable."
+
+[[drop]]
+from = "designer:interaction-design/skills/search-ux"
+reason = "Not in the curated core (sk-plp); revisit via skills-sync."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/a-b-test-design"
+reason = "No traffic to experiment on."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/accessibility-test-plan"
+reason = "Participant-based testing; no participants."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/click-test-plan"
+reason = "Participant-based testing; no participants."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/test-scenario"
+reason = "Participant-based usability tasks; no participants."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/concept-selection"
+reason = "Option choice is covered by tight-spec and grilling."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/parallel-concepts"
+reason = "Exploring alternatives is covered by prototype."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/prototype-strategy"
+reason = "Same job as prototype."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/user-flow-diagram"
+reason = "Flow specification is covered by tight-spec and the state-machine-skeleton principle."
+
+[[drop]]
+from = "designer:prototyping-testing/skills/wireframe-spec"
+reason = "Wireframe handoff for a separate design role; solo dev."
+
+[[drop]]
+from = "designer:ui-design/skills/color-system"
+reason = "Design-system foundations; covered by frontend-design and emil-design-eng, with ux-critique for review."
+
+[[drop]]
+from = "designer:ui-design/skills/dark-mode-design"
+reason = "Design-system foundations; covered by frontend-design, with ux-critique for review."
+
+[[drop]]
+from = "designer:ui-design/skills/typography-scale"
+reason = "Design-system foundations; covered by frontend-design, with ux-critique for review."
+
+[[drop]]
+from = "designer:ui-design/skills/spacing-system"
+reason = "Design-system foundations; covered by frontend-design, with ux-critique for review."
+
+[[drop]]
+from = "designer:ui-design/skills/layout-grid"
+reason = "Design-system foundations; covered by frontend-design, with ux-critique for review."
+
+[[drop]]
+from = "designer:ui-design/skills/responsive-design"
+reason = "Covered by frontend-design and artifact layout rules."
+
+[[drop]]
+from = "designer:ui-design/skills/readable-measure"
+reason = "Covered by ux-critique typography lens."
+
+[[drop]]
+from = "designer:ui-design/skills/visual-hierarchy"
+reason = "Same job as the ux-critique visual-hierarchy lens."
+
+[[drop]]
+from = "designer:ui-design/skills/data-visualization"
+reason = "Same job as the dataviz skill."
+
+[[drop]]
+from = "designer:ui-design/skills/illustration-style"
+reason = "Illustration style guides; not applicable."
+
+[[drop]]
+from = "designer:ui-design/skills/platform-conventions"
+reason = "iOS/Android conventions; no mobile apps."
+
+[[drop]]
+from = "designer:ux-strategy/skills/design-brief"
+reason = "Same job as tight-spec."
+
+[[drop]]
+from = "designer:ux-strategy/skills/business-design"
+reason = "Business and financial strategy; not a dev workflow."
+
+[[drop]]
+from = "designer:ux-strategy/skills/competitive-analysis"
+reason = "Market comparison; not a current need."
+
+[[drop]]
+from = "designer:ux-strategy/skills/content-strategy"
+reason = "Content ownership for content-led products; not applicable."
+
+[[drop]]
+from = "designer:ux-strategy/skills/design-principles"
+reason = "Team trade-off principles; engineering ones live in principles."
+
+[[drop]]
+from = "designer:ux-strategy/skills/experience-map"
+reason = "Multi-channel service ecosystems; not applicable."
+
+[[drop]]
+from = "designer:ux-strategy/skills/metrics-definition"
+reason = "Product KPI definition; no product analytics."
+
+[[drop]]
+from = "designer:ux-strategy/skills/north-star-vision"
+reason = "Org-level vision; repos keep VISION.md by hand."
+
+[[drop]]
+from = "designer:ux-strategy/skills/opportunity-framework"
+reason = "Backlog prioritisation is covered by the tracker and triage."
+
+[[drop]]
+from = "designer:ux-strategy/skills/service-blueprint"
+reason = "Staffed service delivery; not applicable."
+
+[[drop]]
+from = "designer:ux-strategy/skills/stakeholder-alignment"
+reason = "RACI and decision rights for teams; solo dev."
