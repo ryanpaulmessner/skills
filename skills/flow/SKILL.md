@@ -13,7 +13,7 @@ Skills marked * are user-invoked. When one is due, name it to the user (`/tight-
 
 ## New nontrivial work
 
-1. `tight-spec`*: goal, non-goals, acceptance checks, then a `design-pack` (data, state and flow diagrams from the code) for a project. Stop for user approval.
+1. `tight-spec`*: goal, non-goals, acceptance checks, then a `design-pack` for a project: data, state and flow diagrams from the code, proposed state machines and stateful app flows checked with `statechart`*, mockups critiqued with `ux-critique`. Stop for user approval.
 2. `to-tickets`*: approved spec → tracker epic and vertical-slice tickets with blocking edges.
 3. Rundown: your understanding in a few lines. Stop for user pushback.
 4. `implement`*: work the repo's ticket frontier ticket by ticket. `tdd` at seams, `verify-before-claiming` before any done-claim, `code-review` per ticket.
@@ -27,7 +27,7 @@ Too big or too foggy for one session: `wayfinder`* first; when its map clears, e
 - Domain terms, glossary, ADRs → `domain-modeling`.
 - A design or implementation decision → `principles`.
 - Stress-test a plan or idea → `grilling`.
-- A question only running code can settle (state model, UI) → `prototype`.
+- A question only running code can settle (state model, UI) → `prototype`. Whether a state machine or multi-step flow keeps its rules → `statechart`*.
 - Facts from docs, APIs, primary sources → `research`.
 - Raw incoming requests in beads → `triage`*.
 - Reporting a perf number → `benchmark-checklist`*.
@@ -38,7 +38,7 @@ Too big or too foggy for one session: `wayfinder`* first; when its map clears, e
 - Comment cleanup before review → `no-comments`*.
 - Context hand-off to a new session, harness, or person → `handoff`*.
 - Learning a concept over several sessions → `teach`*.
-- UI polish and design critique → `emil-design-eng`. Worst-case data in a screen → `break-ui`. Build motion → `animate`; where motion is missing → `find-animation-opportunities`; dropped frames → `animation-performance`; audit or review existing motion → `improve-animations`, `review-animations`*. Name an effect → `animation-vocabulary`. Gesture and spring UI → `apple-design`. Choosing a frontend library → `pick-ui-library`*. Sonner toasts → `ask-sonner`.
+- A rendered screen to critique, or a heuristic evaluation → `ux-critique` (cite laws from `ux-laws`). Interface copy and empty, loading, error or feedback states → `ui-patterns`. Sitemap, navigation, labels → `information-architecture`*. Craft and polish while building UI → `emil-design-eng`. Worst-case data in a screen → `break-ui`. Build motion → `animate`; where motion is missing → `find-animation-opportunities`; dropped frames → `animation-performance`; audit or review existing motion → `improve-animations`, `review-animations`*. Name an effect → `animation-vocabulary`. Gesture and spring UI → `apple-design`. Choosing a frontend library → `pick-ui-library`*. Sonner toasts → `ask-sonner`.
 - Patterns in past agent sessions, repeated corrections → `analyze-sessions`.
 
 Setup and one-off skills (`setup-pre-commit`, `git-guardrails-claude-code`, `migrate-to-shoehorn`, `scaffold-exercises`, `wizard`) fire on their own descriptions. `wait-what`* is the user's re-pitch request. Upstream back-import for this skill set → `skills-sync`*.
@@ -49,6 +49,7 @@ Setup and one-off skills (`setup-pre-commit`, `git-guardrails-claude-code`, `mig
 - A coordinator Claude Code session plans and dispatches build sessions as pi agents in named tmux windows → `dispatch` (coordinator only). Each build session reports where its brief says.
 - Detect the tracker per repo: `tickets/` → direct `foreman` ticket commands; otherwise `.beads/` → `bd` until user-approved `foreman adopt`. With neither, ask to onboard. The `foreman` skill separates ticket content from best-effort board events.
 - Build-time questions go through `foreman ask decision` and `foreman wait`, not pane prompts. Spec interviews and grilling stay conversational.
+- At coordinator close-out, a slice that changes what users see is looked at rendered and run through `ux-critique` before commit (`dispatch`, step 6.4).
 - At coordinator close-out, use `foreman` through `dispatch`: `review` before checking, `changes` (`request_changes`) when returning findings, `commit` after an authorized commit, then push/open_pr requests (merge when next) and waits. Telemetry warnings never block work; unresolved approval requests block their dependent steps. Agents never push; pushes go through board requests.
 - A repo or workspace skill that runs its own build loop wins over `dispatch` there.
 - Claude subagents (Agent tool; pi `subagent`) only when the user asks for them. This overrides any skill that says to dispatch or fan out subagents: run that work sequentially in context instead, or ask first.

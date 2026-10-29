@@ -1,6 +1,6 @@
 ---
 name: design-pack
-description: Draw the data, state and flow diagrams of a spec before the user approves it. Use from tight-spec or wayfinder before spec approval, or when to-tickets finds a project spec without a design pack.
+description: Draw a spec's data, state, flow and UI views before approval. Use from tight-spec or wayfinder, or when to-tickets finds a project spec without a pack.
 ---
 
 <!-- house: own -->
@@ -44,9 +44,10 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
 <a short table: migration, what it does, reversible? backfill? rows affected (from a count if you can run one)>
 
 ## State
-<per touched machine: "Now" stateDiagram-v2 from code, "Proposed" with changes marked;
- new machines from the spec's state table. Under each: events added/changed, guards, and which
- code or user action fires each new event.>
+<per touched machine, and per app flow with rules that a user moves through over several steps:
+ "Now" stateDiagram-v2 from code; "Proposed" from the `statechart` skill (model-checked against the
+ spec's rules), changes marked. Under each: events added/changed, guards, which code or user action
+ fires each new event, and the rules checked (or each rule that breaks, with its path).>
 
 ## Flows
 <per main user flow: sequenceDiagram user → UI → context/service → DB/jobs.
@@ -55,7 +56,8 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
 
 ## UI
 <links to mockup artifacts built from the app's real CSS and markup, one line each on what it shows;
- or "Skipped: <reason>">
+ per changed screen, its states (empty, loading, partial, error, success) and their copy;
+ the ux-critique findings fixed or left open; or "Skipped: <reason>">
 ```
 
 ## Steps
@@ -63,9 +65,18 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
 1. Read the spec's Decisions (and its state table, if any). List the tables, machines and flows it
    touches. If the list is empty for a part, write that part's skip reason now.
 2. Read the current schema and machines from the code; draw "Now". Then draw "Proposed" with the marks.
+   For each new or changed machine, and each stateful app flow, follow `../statechart/SKILL.md`: the
+   spec's state table and rules become the model, and its chart is the Proposed diagram. A rule that
+   breaks is a spec gap: fix the spec, or ask the user, before approval. Without the toolchain, draw
+   Proposed by hand from the state table and say so in the pack.
 3. Draw the flows. Every state event named in the spec appears in at least one flow; every new table
    is written or read in at least one flow. A gap here is usually a gap in the spec: fix the spec too.
 4. UI part: if the spec changes a page, build or link mockups (repo rules on mockups apply).
+   - List each changed screen's states and their copy, using the `ui-patterns` skill.
+   - Run the `ux-critique` skill on the rendered mockups (all its visual lenses; `heuristic-evaluation`
+     for a multi-step flow). Fix what the mockup can fix; list the rest in the pack.
+   - New pages, a new section of the navigation, or renamed areas: name `information-architecture`*
+     (user-invoked) to the user before the mockups.
 5. Save the file beside the spec. With a foreman draft epic, pass it on approval:
    `foreman epic approve draft:<slug> --project <p> --spec <spec> --design <pack>` (through the
    `foreman` skill). Tell the user the board's draft epic page shows the pack.

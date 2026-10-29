@@ -100,7 +100,7 @@ The answer isn't part of the question; it's recorded in Notes (files) or a comme
 Every ticket is either **HITL** (human in the loop, worked _with_ a human who speaks for themselves) or **AFK**, driven by the agent alone. A HITL ticket only resolves through that live exchange; the agent never stands in for the human's side of it (a grilling agent that answers its own questions has broken this).
 
 - **Research** (AFK): Reading documentation, third-party APIs, or local resources like knowledge bases to surface a fact a decision waits on. Resolved by a subagent that runs the `research` skill. Use when knowledge outside the current working directory is required.
-- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by running the `prototype` skill. Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question. When the question is a data shape or a state model, a diagram drawn from the current code (the `design-pack` skill's rules: "Now" from code, "Proposed" with changes marked) is often the cheapest prototype.
+- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by running the `prototype` skill. Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question. When the question is a data shape or a state model, a diagram drawn from the current code (the `design-pack` skill's rules: "Now" from code, "Proposed" with changes marked) is often the cheapest prototype. For a state model or a multi-step app flow whose rules are in question, a `statechart` model is the prototype: the user reacts to the chart and to each rule that breaks.
 - **Grilling** (HITL): Conversation. The default case. Always run the `grilling` and `domain-modeling` skills.
 - **Task** (HITL or AFK): Manual work that must happen before a _decision_ can be made: nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that _does_ rather than decides, and it earns its place by unblocking a decision, not by delivering the destination. The agent drives it alone where it can (AFK); otherwise it hands the human a precise checklist (HITL). Resolved when the work is done; the answer records what was done and any resulting facts (credentials location, new URLs, row counts) later tickets depend on.
 
@@ -153,7 +153,7 @@ User invokes with a map (ticket id). A ticket is **optional**: without one, you 
 ### Reaching a spec destination
 
 When the destination is a spec and the frontier is empty, the closing session writes the spec (the
-`tight-spec` format) and its design pack (the `design-pack` skill: data, state and flow diagrams, required,
+`tight-spec` format) and its design pack (the `design-pack` skill: data, state, flow and UI views, required,
 parts skipped only with a reason) before the user approves it and runs `to-tickets`. Link both from the
 map's Destination. Diagrams made by earlier prototype tickets are inputs, redrawn against the current code.
 

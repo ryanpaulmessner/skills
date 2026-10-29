@@ -4,7 +4,7 @@ description: "Interview the user into a bounded, measurable spec before building
 disable-model-invocation: true
 ---
 
-<!-- house: merge; from: own:skills/tight-spec@pre-merge, mattpocock:skills/engineering/to-spec@49dd158, mattpocock:skills/productivity/grilling@49dd158, mattpocock:skills/engineering/grill-with-docs@49dd158, superpowers:skills/brainstorming@bb92a77, pstack:pstack/skills/sharpen@850d7f2, pstack:pstack/skills/figure-it-out@850d7f2; not taken (catalog drops): pstack interrogate, pstack how, mattpocock grill-me; house edit 2026-10-16: state table in Decisions -->
+<!-- house: merge; from: own:skills/tight-spec@pre-merge, mattpocock:skills/engineering/to-spec@49dd158, mattpocock:skills/productivity/grilling@49dd158, mattpocock:skills/engineering/grill-with-docs@49dd158, superpowers:skills/brainstorming@bb92a77, pstack:pstack/skills/sharpen@850d7f2, pstack:pstack/skills/figure-it-out@850d7f2; not taken (catalog drops): pstack interrogate, pstack how, mattpocock grill-me; house edit 2026-10-16: state table in Decisions; 2026-10-29 (sk-fip): state rules for statechart, UI states, IA prompt -->
 
 # Tight Spec
 
@@ -67,6 +67,11 @@ ones. A guess they can correct often beats a question.
 - hidden dependencies on live services, user state, or environment
 - narrow remediation vs. broad redesign — which did they mean?
 - constraints that don't serve the goal (loosen them as readily as you add ones that do)
+- a state machine or a multi-step app flow with no stated rules: ask what each state allows and
+  forbids, in the user's words; those rules are what `statechart` checks in the design pack
+- a UI change with unnamed states: what the screen shows while empty, loading, partly loaded, on error
+  and on success, and the words it uses (the `ui-patterns` skill's list); a new page or a new place in
+  the navigation: name `information-architecture`* to the user
 
 **Design alternatives.** Where the approach has a real fork, think of several options privately, drop the
 weak ones (including any that fight the stated why), and present 2–3 with tradeoffs and your pick. Don't
@@ -95,8 +100,10 @@ Stop interviewing once the next implementation step is clear and bounded. Better
 
 ## Decisions
 <numbered; each marked (user) or (agent call). Modules and interfaces touched, contracts, schema.
-Nontrivial state mechanics: include the state table (states, events, transitions) per the principles
-skill's `state-machine-skeleton`.
+Nontrivial state mechanics, and each app flow a user moves through over several steps: include the
+state table (states, events, transitions) per the principles skill's `state-machine-skeleton`, plus its
+rules: one line per thing a state allows or forbids, in the user's words.
+UI changes: each changed screen's states and their copy.
 No file paths or code — they go stale. Exception: a prototype snippet that pins a decision better than
 prose (state machine, schema, type shape), trimmed and labeled as from a prototype.>
 
@@ -116,7 +123,8 @@ highest one possible; fewest seams wins. Confirm the seams with the user.>
 ```
 
 For a project-size spec, save the spec at the draft's spec path and run the builder check in `references/builder-check.md` before handing it over.
-Then run the `design-pack` skill: data, state and flow diagrams beside the spec, drawn from the code. It
+Then run the `design-pack` skill: data, state, flow and UI views beside the spec, "Now" drawn from the code,
+proposed machines checked with `statechart`, mockups critiqued with `ux-critique`. It
 is required for a project spec; a part may be skipped only with a stated reason. Fold any gap the pack
 exposes back into the spec.
 

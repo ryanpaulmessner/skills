@@ -65,6 +65,9 @@ ticket; green is promised only there.
 - **Coverage** — every spec acceptance check and decision maps to a ticket. Add tickets for gaps.
 - **Failure modes** — inputs or conditions the spec implies but no ticket exercises get an acceptance
   criterion on the ticket that owns that code.
+- **States** — each UI ticket's acceptance names every state its screen can enter (empty, loading,
+  partial, error, success) with its copy, per the `ui-patterns` skill; each ticket that adds or changes
+  a state machine names the rules it must keep, from the spec's state table.
 - **No empty lines** — "handle edge cases", "add validation", "TBD" decide nothing. Replace or delete.
 - **Proportion** — tickets carry decisions, not transcripts of the code.
 

@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review a diff since a fixed point (commit, branch, merge-base) on separate Standards and Spec axes, plus Risk when asked what it could break; and handle review feedback received. Use for "review this branch/PR/since X", "what could this break", or when acting on review comments.
+description: Review a diff since a fixed point on Standards and Spec axes, plus Risk when asked what it could break; and handle review feedback. Use for "review this branch/PR/since X", "what could this break", or when acting on review comments.
 ---
 
 <!-- house: merge; from: mattpocock:skills/engineering/code-review@49dd158, superpowers:skills/requesting-code-review@bb92a77, superpowers:skills/receiving-code-review@bb92a77, pstack:pstack/skills/blast-radius@850d7f2, pstack:pstack/agents/comment-sicko.md@850d7f2; house edit 2026-10-16: axes run sequentially unless the user asked for subagents -->

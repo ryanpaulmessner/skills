@@ -21,6 +21,14 @@ pin = "850d7f2e9f5e55dff7eb00a0a479337fe79eb22f"
 # Only this subtree is the pstack plugin; the rest of the repo is other Cursor plugins.
 scope = "pstack"
 
+[sources.pstack-statechart]
+repo = "https://github.com/cursor/plugins"
+path = "~/dev/utils/skill-sources/cursor-plugins-statechart"
+pin = "c742dd61706fbacc1b95f1a20b7b988cf096ce6c"
+# pstack 0.15.36, statechart only (sk-fip). A separate clone so the rest of pstack stays at its
+# own pin until a full sync decides 850d7f2..c742dd6 (sk-fip follow-up).
+scope = "pstack/skills/statechart"
+
 [sources.humanlayer]
 repo = "https://github.com/humanlayer/skills"
 path = "~/dev/utils/skill-sources/humanlayer-skills"
@@ -815,3 +823,9 @@ reason = "Staffed service delivery; not applicable."
 [[drop]]
 from = "designer:ux-strategy/skills/stakeholder-alignment"
 reason = "RACI and decision rights for teams; solo dev."
+
+[[skill]]
+name = "statechart"
+job = "state-machine-model-check"
+mode = "adapt"
+from = ["pstack-statechart:pstack/skills/statechart"]
