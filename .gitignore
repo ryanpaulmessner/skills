@@ -5,3 +5,6 @@
 .beads-credential-key
 .beads/proxieddb/
 __pycache__/
+
+# statechart test deps (npm install in scripts/)
+skills/statechart/scripts/node_modules/

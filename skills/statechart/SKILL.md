@@ -3,8 +3,7 @@ name: statechart
 description: "Check a TLA+ model of a system that moves between states, such as a product flow, a protocol, or a service, and draw it as a Mermaid statechart. The report gives the shortest path to each state that breaks a rule. Use for /statechart, or to show a bug as a path through states."
 disable-model-invocation: true
 ---
-
-<!-- house: adapt; from: pstack-statechart:pstack/skills/statechart@c742dd6 (pstack 0.15.36). Edits: scripts/test/ (corpus and fuzz tests, 2.7 MB) not vendored; added "In the house planning flow" and the toolchain note under Run. -->
+<!-- house: adapt; from: pstack:pstack/skills/statechart@4dd1d05. Edits: added "In the house planning flow" and the toolchain note under Run. -->
 
 # Statechart
 
@@ -18,6 +17,7 @@ The chart shows how a system moves between states, in the words of the person wh
 - Model only what the spec decides. Keep constants small (two users, two tickets) so the chart stays near 20 arrows.
 - Put `chart.mmd` in the design pack as the Proposed diagram, with the report's bug paths under it. A rule that breaks is a gap in the spec: fix the spec or ask the user, before approval.
 - Keep the `.tla`, `.cfg` and view files in the scratch folder, and give their path and the rerun command in the pack.
+- When the machine guards something costly (money, metric numbers, permissions, data that two jobs write), say in the pack that `create-formal-verification-skill` can keep the model checked against the code after the build.
 
 ## Run
 
