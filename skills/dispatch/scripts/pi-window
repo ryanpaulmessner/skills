@@ -55,7 +55,7 @@ report=${report:-drafts/sessions/$name.md}
 # an unpinned first turn is routed by Bifrost and ignores --model (sk-k9j).
 first_msg=" \"\$(<$(printf '%q' "$brief"))\""
 [ "$model" = default ] || first_msg=""
-launch="export FOREMAN_ACTOR=pi FOREMAN_SESSION=$name FOREMAN_TICKETS=$(printf '%q' "${beads[*]:-}"); pi --name \"$name\"$extra$first_msg; echo; echo \"[pi exited] press enter\"; read"
+launch="export FOREMAN_ACTOR=pi FOREMAN_SESSION=$name FOREMAN_TICKETS=$(printf '%q' "${beads[*]:-}"); foreman session register --name \"\$FOREMAN_SESSION\" --pane \"\$TMUX_PANE\" --workdir \"\$PWD\" --harness pi >/dev/null 2>&1 || true; pi --name \"$name\"$extra$first_msg; echo; echo \"[pi exited] press enter\"; read"
 launch=${launch//\'/\'\\\'\'}
 target=$name
 if [ "$mode" = pane ]; then
@@ -101,7 +101,7 @@ if [ "${#beads[@]}" -gt 0 ]; then
     sender=$(dirname "$(realpath "$0")")/../../foreman/scripts/foreman-send
     for id in "${beads[@]}"; do
       (cd "$dir"; FOREMAN_ACTOR=pi FOREMAN_SESSION="$name" bash "$sender" dispatch "$id" \
-        --window "$target" --harness pi --model "$model" --workdir "$dir" \
+        --session "$name" --window "$target" --harness pi --model "$model" --workdir "$dir" \
         --branch "$branch" --base "$base" --brief "$brief" --report "$report") || \
         echo "warning: foreman adapter unavailable; continuing" >&2
     done
