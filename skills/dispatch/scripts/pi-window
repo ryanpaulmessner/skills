@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Launch a pi build in a new window, or a named pane of the caller's window.
 # usage: pi-window [--pane] <name> <workdir> <brief-file> [--bead ID ... --report PATH] [--] [pi-args...]
-# The brief file's contents become pi's first message; extra args go to pi before it
+# The brief file's contents become pi's first message (with --model: pi starts idle, Bifrost is pinned,
+# then a one-line pointer to the brief is sent); extra args go to pi before it
 # (e.g. `-e <path>` to try an extension for this run only). pi runs under an interactive
 # zsh so ~/.zshrc.local's pi() wrapper (TypeSafe key, Jev flags) applies.
 set -euo pipefail
@@ -50,7 +51,11 @@ branch=$(git -C "$dir" branch --show-current 2>/dev/null) || branch=unknown
 branch=${branch:-detached}
 report=${report:-drafts/sessions/$name.md}
 [[ $report = /* ]] || report="$dir/$report"
-launch="export FOREMAN_ACTOR=pi FOREMAN_SESSION=$name FOREMAN_TICKETS=$(printf '%q' "${beads[*]}"); pi --name \"$name\"$extra \"\$(<$(printf '%q' "$brief"))\"; echo; echo \"[pi exited] press enter\"; read"
+# With an explicit model, pi starts idle so Bifrost can be pinned before the first message:
+# an unpinned first turn is routed by Bifrost and ignores --model (sk-k9j).
+first_msg=" \"\$(<$(printf '%q' "$brief"))\""
+[ "$model" = default ] || first_msg=""
+launch="export FOREMAN_ACTOR=pi FOREMAN_SESSION=$name FOREMAN_TICKETS=$(printf '%q' "${beads[*]:-}"); pi --name \"$name\"$extra$first_msg; echo; echo \"[pi exited] press enter\"; read"
 launch=${launch//\'/\'\\\'\'}
 target=$name
 if [ "$mode" = pane ]; then
@@ -66,6 +71,28 @@ else
   tmux new-window -d -n "$name" -c "$dir" "zsh -ic '$launch'"
   tmux set-option -w -t ":$name" automatic-rename off >/dev/null
   echo "launched pi in window '$name' ($dir)"
+fi
+pane_text() { tmux capture-pane -p -J -t "$target" 2>/dev/null || true; }
+wait_for() { # wait_for <regex> <seconds>
+  local i
+  for ((i=0; i<$2; i++)); do pane_text | grep -Eq "$1" && return 0; sleep 1; done
+  return 1
+}
+send_line() { tmux send-keys -t "$target" -l "$1"; sleep 0.5; tmux send-keys -t "$target" Enter; }
+if [ "$model" != default ]; then
+  next="answer it, run /bifrost pin, check the footer shows $model, then send: Read the brief at $brief and follow it."
+  if ! wait_for 'Bifrost' 60; then
+    if pane_text | grep -qi 'trust'; then echo "warning: pi shows its trust prompt; $next" >&2
+    else echo "warning: pi did not start within 60 s; $next" >&2; fi
+  else
+    send_line "/bifrost pin"
+    if wait_for 'Bifrost · pinned' 15 && pane_text | grep -qF "${model#*/}"; then
+      send_line "Read the brief at $brief and follow it."
+      echo "pinned $model and sent the brief"
+    else
+      echo "warning: could not confirm Bifrost pinned on $model; read the pane, then send: Read the brief at $brief and follow it." >&2
+    fi
+  fi
 fi
 if [ "${#beads[@]}" -gt 0 ]; then
   if ! command -v foreman >/dev/null 2>&1; then
