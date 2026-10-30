@@ -70,6 +70,7 @@ retry blindly, fabricate intermediate events or call a warning a successful boar
 | Coordinator begins close-out, before gates/review | `foreman review <id>` |
 | Review sends work back to the build session | `foreman changes <id> "<finding and required check>"` |
 | Actual commit exists, user authorized it | `foreman commit <id> --sha <sha>` |
+| Coordinator built and committed the work itself (no dispatch) | `FOREMAN_ACTOR=claude foreman commit <id> --sha <sha>` from queued, dispatched or building; records source `coordinator`. Pi cannot skip stages. |
 | User stops / resumes abandoned work | `foreman abandon <id>` / `foreman revive <id>` |
 
 For pane builds, dispatch's existing `--window` field carries the stable tmux `%pane-id`, while
@@ -77,7 +78,7 @@ For pane builds, dispatch's existing `--window` field carries the stable tmux `%
 
 `changes` sends the machine's `request_changes` event. A correction cycle is changes → progress →
 report → review → commit; send review again for the new report. Never emit commit for planned or
-uncommitted work. Board success is not verification and grants no permission to commit or push.
+uncommitted work. A stage refusal prints the current `stage` and the `next_command`: run that, filled in, and never send invented intermediate events. Board success is not verification and grants no permission to commit or push.
 
 ## Approval requests: ask and wait directly
 
@@ -87,7 +88,8 @@ Agents never push. Pushes go through board requests; the board worker performs a
 
 | Kind | Ask (returns a request UUID) |
 | --- | --- |
-| Build-time question | `foreman ask decision <ticket> --question "<question>" --option "<A>" --option "<B>" --recommendation "<A>"` |
+| Build-time question | `foreman ask decision <ticket> --question "<question>" --text $'What: …\nPart of: …\nFrom: …\nWhy now: …' --option "<A>" --option-detail "<A>=<what happens>" --option "<B>" --option-detail "<B>=<what happens>" --recommendation "<A>"` |
+| Screenshots to review | `foreman ask review_ui <ticket> --question "Does <feature> look right?" --text "<What / Part of / Why now>" --image <file-or-folder> [--image …] --look-at "<what to check>"` (or `--artifact <https-url>`) |
 | Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` |
 | Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` |
 | Merge (board-merge repos only) | `foreman ask merge <ticket> --pr <number> --sha <expected-head-sha>` |
@@ -133,9 +135,14 @@ one-off tickets included. Report the PR URL and keep the ticket open: forge sync
 parent are not retargeted; leave that to the person on GitHub. Never fall back to `git merge`,
 `gh pr merge` or a direct push.
 
-**Writing a card.** One question per card. Start the question with What / Part of (one-off, or
-the epic) / From (Asana, Support Board T-###, Ryan's note, or "found while doing X") / Why now,
-and give every option an `--option-detail "<option>=<what happens>"`. A card must make sense to
+**Writing a card.** One question per card. Put What / Part of (one-off, or the epic) / From (Asana,
+Support Board T-###, Ryan's note, or "found while doing X") / Why now in `--text`, and give every
+option an `--option-detail "<option>=<what happens>"`. The board refuses a decision without What,
+Part of, Why now or an option detail (`card_unclear` names what is missing). Screenshots go on a
+`review_ui` card, never as local paths in text: `--image` takes PNG/JPEG/GIF/WebP files or a folder
+(a `verify ui` run folder gives width and theme from its result.json; otherwise `<path>@1440x900:dark`).
+Images must be under the repo, `~/.cache/verify/runs` or a folder you pass with `--scratchpad`; no
+symlinks. Options are fixed (Looks right / Change it); per-image comments come back in `note`. A card must make sense to
 someone who has not read your session. Withdraw your own stale card with
 `foreman withdraw <request-id> --reason "<why>"`; never leave Ryan a question that no longer applies.
 
