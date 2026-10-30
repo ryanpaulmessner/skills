@@ -91,6 +91,7 @@ Agents never push. Pushes go through board requests; the board worker performs a
 | Build-time question | `foreman ask decision <ticket> --question "<question>" --text $'What: …\nPart of: …\nFrom: …\nWhy now: …' --option "<A>" --option-detail "<A>=<what happens>" --option "<B>" --option-detail "<B>=<what happens>" --recommendation "<A>"` |
 | Screenshots to review | `foreman ask review_ui <ticket> --question "Does <feature> look right?" --text "<What / Part of / Why now>" --image <file-or-folder> [--image …] --look-at "<what to check>"` (or `--artifact <https-url>`) |
 | Human step (sign-in, re-login, usage reset) | `foreman ask chore <ticket> --question "<what to do>" --step "<step>" [--step …] [--key "signin:<host>"]`: one Done button; the same key joins one pending chore across tickets and repos |
+| Several items, one question | `foreman ask batch <ticket> --question "<q>" --text "<What / Part of / Why now>" --item "<id>=<label>" [--item-detail "<id>=<detail>"] …`: one card, a checkbox per item; `outcome.answer` = checked ids (empty is valid). Use it instead of N identical cards |
 | Fix your pending card | `foreman ask update <request-id> [--question …] [--text …] [--option … --option-detail …] [--doc …]`: only the session that asked; options given replace the list; lint still applies |
 | Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` (branch with an open PR: add `--expected-old-head <its current remote sha>`) |
 | Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` (`--base-ok` only for an exception you explain) |
@@ -158,6 +159,8 @@ can mark an answer "Always". `ask decision` then refuses the same question and o
 response carries `standing_answer` (plain output prints JSON then): if it already answers you,
 withdraw the new card. Withdraw your own stale card with
 `foreman withdraw <request-id> --reason "<why>"`; never leave Ryan a question that no longer applies.
+
+**Note to every coordinator** (coordinators only): `FOREMAN_ACTOR=claude FOREMAN_SESSION=<you> foreman note --all-coordinators "<text>" --json`. Read `delivered` and `skipped` (busy, ended or gone panes are skipped, never queued).
 
 **Card questions.** Ryan can ask about a pending card from the board. The question arrives in your
 session as `[card question <request-id>] <text>`. Answer it on the card, not only in chat:
