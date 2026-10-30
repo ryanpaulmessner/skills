@@ -67,7 +67,9 @@ ticket; green is promised only there.
   criterion on the ticket that owns that code.
 - **States** — each UI ticket's acceptance names every state its screen can enter (empty, loading,
   partial, error, success) with its copy, per the `ui-patterns` skill; each ticket that adds or changes
-  a state machine names the rules it must keep, from the spec's state table.
+  a state machine names the rules it must keep, from the spec's state table. A pack line "Formal check:
+  recommended" becomes its own ticket, blocked by the build ticket: run `create-formal-verification-skill`*
+  on the built code for that property (the user starts it; it leaves a repo-local verify skill).
 - **No empty lines** — "handle edge cases", "add validation", "TBD" decide nothing. Replace or delete.
 - **Proportion** — tickets carry decisions, not transcripts of the code.
 

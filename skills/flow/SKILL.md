@@ -27,7 +27,7 @@ Too big or too foggy for one session: `wayfinder`* first; when its map clears, e
 - Domain terms, glossary, ADRs → `domain-modeling`.
 - A design or implementation decision → `principles`.
 - Stress-test a plan or idea → `grilling`.
-- A question only running code can settle (state model, UI) → `prototype`. Whether a state machine or multi-step flow keeps its rules → `statechart`*.
+- A question only running code can settle (state model, UI) → `prototype`. Whether a state machine or multi-step flow keeps its rules → `statechart`*. Keep a costly promise (race, retry, state machine, invariant) checked against the code with a repo-local verify skill → `create-formal-verification-skill`*; bring it back in line after unchecked changes → `maintain-formal-verification-skill`*.
 - Facts from docs, APIs, primary sources → `research`.
 - Raw incoming requests in beads → `triage`*.
 - Reporting a perf number → `benchmark-checklist`*.
@@ -49,7 +49,7 @@ Setup and one-off skills (`setup-pre-commit`, `git-guardrails-claude-code`, `mig
 - A coordinator Claude Code session plans and dispatches build sessions as pi agents in named tmux windows → `dispatch` (coordinator only). Each build session reports where its brief says.
 - Detect the tracker per repo: `tickets/` → direct `foreman` ticket commands; otherwise `.beads/` → `bd` until user-approved `foreman adopt`. With neither, ask to onboard. The `foreman` skill separates ticket content from best-effort board events.
 - Build-time questions go through `foreman ask decision` and `foreman wait`, not pane prompts. Spec interviews and grilling stay conversational.
-- At coordinator close-out, a slice that changes what users see is looked at rendered and run through `ux-critique` before commit (`dispatch`, step 6.4).
+- At coordinator close-out, a slice that changes what users see is looked at rendered and run through `ux-critique` before commit, and a diff that touches formally verified code runs that repo's verify skill (`dispatch`, step 6.4).
 - At coordinator close-out, use `foreman` through `dispatch`: `review` before checking, `changes` (`request_changes`) when returning findings, `commit` after an authorized commit, then push/open_pr requests (merge when next) and waits. Telemetry warnings never block work; unresolved approval requests block their dependent steps. Agents never push; pushes go through board requests.
 - A repo or workspace skill that runs its own build loop wins over `dispatch` there.
 - Claude subagents (Agent tool; pi `subagent`) only when the user asks for them. This overrides any skill that says to dispatch or fan out subagents: run that work sequentially in context instead, or ask first.

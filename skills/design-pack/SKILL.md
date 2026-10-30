@@ -47,7 +47,9 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
 <per touched machine, and per app flow with rules that a user moves through over several steps:
  "Now" stateDiagram-v2 from code; "Proposed" from the `statechart` skill (model-checked against the
  spec's rules), changes marked. Under each: events added/changed, guards, which code or user action
- fires each new event, and the rules checked (or each rule that breaks, with its path).>
+ fires each new event, and the rules checked (or each rule that breaks, with its path).
+ If the machine guards something costly (money, metric numbers, permissions, data two jobs write),
+ add "Formal check: recommended" and the property in one sentence; to-tickets turns it into a ticket.>
 
 ## Flows
 <per main user flow: sequenceDiagram user → UI → context/service → DB/jobs.
