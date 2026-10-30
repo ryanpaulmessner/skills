@@ -92,8 +92,8 @@ Agents never push. Pushes go through board requests; the board worker performs a
 | Screenshots to review | `foreman ask review_ui <ticket> --question "Does <feature> look right?" --text "<What / Part of / Why now>" --image <file-or-folder> [--image …] --look-at "<what to check>"` (or `--artifact <https-url>`) |
 | Human step (sign-in, re-login, usage reset) | `foreman ask chore <ticket> --question "<what to do>" --step "<step>" [--step …] [--key "signin:<host>"]`: one Done button; the same key joins one pending chore across tickets and repos |
 | Fix your pending card | `foreman ask update <request-id> [--question …] [--text …] [--option … --option-detail …] [--doc …]`: only the session that asked; options given replace the list; lint still applies |
-| Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` |
-| Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` |
+| Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` (branch with an open PR: add `--expected-old-head <its current remote sha>`) |
+| Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` (`--base-ok` only for an exception you explain) |
 | Merge (board-merge repos only) | `foreman ask merge <ticket> --pr <number> --sha <expected-head-sha>` |
 
 Add `--project <configured-project>` when needed for resolution. Decision options and recommendation
@@ -127,6 +127,11 @@ Default-branch pushes are only for one-off tickets without an epic (never in hum
 epic work reaches default through PRs. Push binds worktree, local branch, SHA and destination; open_pr binds the remote head SHA and
 base. After push `done`, allow the board's branch snapshot to refresh before asking open_pr; a
 snapshot refusal is not permission to open it directly. Never weaken guards or fabricate stage events.
+To update a branch that has an open PR, pass `--expected-old-head`; the push must be a fast-forward.
+`--force-with-lease` replaces history and the card warns Ryan; use it only when a rebase was asked for.
+Open PR bases must be the repo's `merge_base` (else the forge default) or the head branch of an open
+PR for a recorded blocker of this ticket (`foreman dep add`); otherwise `base_unexpected` names the
+allowed bases. A board merge also retargets the child PR to that base; the merge card names it.
 
 **Human-merge repos** (`merge_policy = "human"` on the repo or at the top of `foreman.toml`; the
 work repos): every change reaches a shared branch through a GitHub PR that a person merges.
