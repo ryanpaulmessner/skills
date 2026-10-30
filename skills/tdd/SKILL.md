@@ -29,6 +29,7 @@ Never write all the tests first (horizontal slicing tests imagined behaviour). E
 
 **RED.** Before writing the body, name the production break this test catches. Can't name one → it is a change detector or tautology; pick a behaviour instead. Write one test for one behaviour, with expected values derived independently (literal, worked example, spec), never recomputed the way the code does. Run it.
 - It must fail on its assertion, for the reason you named. A compile/link error, missing symbol, or crash is not RED yet: add the minimal stub (empty function, `{:error, :todo}`, `return 0`) and re-run.
+- Stub header-first: declare the signature, write the test, then add the stub body as its own edit of under 10 lines (one constant return per function). pi's write guard rejects 10+ line diffs that look like placeholders; if it still refuses, report the refusal and keep the link error as the RED evidence.
 - It passes? You are testing existing behaviour or the test is wrong. Fix the test.
 
 **GREEN.** Write the simplest code that passes. No speculative options, no anticipating the next test. Run the test; then the module's tests. Fails → fix the code, not the test.
