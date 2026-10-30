@@ -90,6 +90,8 @@ Agents never push. Pushes go through board requests; the board worker performs a
 | --- | --- |
 | Build-time question | `foreman ask decision <ticket> --question "<question>" --text $'What: …\nPart of: …\nFrom: …\nWhy now: …' --option "<A>" --option-detail "<A>=<what happens>" --option "<B>" --option-detail "<B>=<what happens>" --recommendation "<A>"` |
 | Screenshots to review | `foreman ask review_ui <ticket> --question "Does <feature> look right?" --text "<What / Part of / Why now>" --image <file-or-folder> [--image …] --look-at "<what to check>"` (or `--artifact <https-url>`) |
+| Human step (sign-in, re-login, usage reset) | `foreman ask chore <ticket> --question "<what to do>" --step "<step>" [--step …] [--key "signin:<host>"]`: one Done button; the same key joins one pending chore across tickets and repos |
+| Fix your pending card | `foreman ask update <request-id> [--question …] [--text …] [--option … --option-detail …] [--doc …]`: only the session that asked; options given replace the list; lint still applies |
 | Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` |
 | Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` |
 | Merge (board-merge repos only) | `foreman ask merge <ticket> --pr <number> --sha <expected-head-sha>` |
@@ -115,6 +117,7 @@ Wait always prints JSON:
 | `state: done` | The action completed; inspect `outcome` before proceeding. |
 | `state: pending`, `approved`, or `executing` | Unresolved, including timeout: wait again on the same ID. |
 | `state: declined` or `withdrawn` | Stop the dependent work; report the state and note. No automatic re-ask. |
+| `state: wrong_question` | Ryan says the premise or options are wrong; `note` says why. Fix them and ask one corrected card. Not a "no". |
 | `state: failed` or `superseded` | Inspect reason and live facts; any replacement needs a new request. For unknown/partial outcomes, observe what happened before proposing another write. |
 | `warning`, missing state or unreadable output | Unresolved, not permission. Retain diagnostics/ID, report the blocker, and resume waiting when available. |
 
@@ -143,7 +146,12 @@ Part of, Why now or an option detail (`card_unclear` names what is missing). Scr
 (a `verify ui` run folder gives width and theme from its result.json; otherwise `<path>@1440x900:dark`).
 Images must be under the repo, `~/.cache/verify/runs` or a folder you pass with `--scratchpad`; no
 symlinks. Options are fixed (Looks right / Change it); per-image comments come back in `note`. A card must make sense to
-someone who has not read your session. Withdraw your own stale card with
+someone who has not read your session. To fix a pending card, use `ask update`; never withdraw and
+repost. Use a `chore` card, not a decision, for a step only Ryan can do. **Standing answers:** Ryan
+can mark an answer "Always". `ask decision` then refuses the same question and options
+(`already_answered`, with `standing_answer`): use that answer. A close match is accepted but the
+response carries `standing_answer` (plain output prints JSON then): if it already answers you,
+withdraw the new card. Withdraw your own stale card with
 `foreman withdraw <request-id> --reason "<why>"`; never leave Ryan a question that no longer applies.
 
 **Card questions.** Ryan can ask about a pending card from the board. The question arrives in your
