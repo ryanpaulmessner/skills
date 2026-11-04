@@ -5,6 +5,8 @@
 # then a one-line pointer to the brief is sent); extra args go to pi before it
 # (e.g. `-e <path>` to try an extension for this run only). pi runs under an interactive
 # zsh so ~/.zshrc.local's pi() wrapper (TypeSafe key, Jev flags) applies.
+# Identity: pi starts with a fresh `--session-id <uuid>` (or the one passed in pi-args); the caller's
+# FOREMAN_SESSION is the build's coordinator, sent as `--coordinator` on dispatch and `--parent` on register.
 set -euo pipefail
 mode=window
 if [ "${1:-}" = --pane ]; then mode=pane; shift; fi
@@ -24,12 +26,23 @@ while [ $# -gt 0 ]; do
 done
 model=default
 args=("$@")
+pi_session="" own_session=yes
 for ((i=0; i<${#args[@]}; i++)); do
   case ${args[i]} in
     --model|-m) model=${args[i+1]:-default} ;;
     --model=*) model=${args[i]#--model=} ;;
+    --session-id) pi_session=${args[i+1]:-} own_session=no ;;
+    --session-id=*) pi_session=${args[i]#--session-id=} own_session=no ;;
+    # These pick an existing session (or none); pi refuses them next to --session-id.
+    --session|--session=*|--continue|-c|--resume|-r|--no-session) own_session=no ;;
   esac
 done
+new_uuid() {
+  if command -v uuidgen >/dev/null 2>&1; then uuidgen | tr '[:upper:]' '[:lower:]'
+  elif [ -r /proc/sys/kernel/random/uuid ]; then cat /proc/sys/kernel/random/uuid
+  else python3 -c 'import uuid; print(uuid.uuid4())'
+  fi
+}
 extra=""
 for a in "$@"; do
   # The launch command is single-quoted for zsh -ic, so an arg holding a quote would break out of it.
@@ -40,6 +53,17 @@ done
 [ -d "$dir" ] || { echo "no such workdir: $dir" >&2; exit 2; }
 [ -s "$brief" ] || { echo "brief file missing or empty: $brief" >&2; exit 2; }
 [ -n "${TMUX:-}" ] || { echo "not inside tmux" >&2; exit 2; }
+# The caller's own session is the coordinator; a build relaunched under its own name has none.
+coordinator=${FOREMAN_SESSION:-}
+[ "$coordinator" != "$name" ] || coordinator=""
+if [ -n "$coordinator" ] && ! [[ $coordinator =~ ^[A-Za-z0-9._:-]{1,64}$ ]]; then
+  echo "warning: FOREMAN_SESSION is not a session name; launching without a coordinator" >&2
+  coordinator=""
+fi
+if [ "$own_session" = yes ]; then
+  pi_session=$(new_uuid) || pi_session=""
+  [[ $pi_session =~ ^[0-9a-f-]{36}$ ]] || { echo "could not generate a pi session id" >&2; exit 2; }
+fi
 if tmux list-windows -F '#W' | grep -qx "$name"; then echo "window already exists: $name" >&2; exit 1; fi
 if tmux list-panes -s -F '#{pane_id} #{@build}' | awk -v name="$name" '$2 == name { found=1 } END { exit !found }'; then
   echo "pane already exists: $name" >&2; exit 1
@@ -55,7 +79,13 @@ report=${report:-drafts/sessions/$name.md}
 # an unpinned first turn is routed by Bifrost and ignores --model (sk-k9j).
 first_msg=" \"\$(<$(printf '%q' "$brief"))\""
 [ "$model" = default ] || first_msg=""
-launch="export FOREMAN_ACTOR=pi FOREMAN_SESSION=$name FOREMAN_TICKETS=$(printf '%q' "${beads[*]:-}"); foreman session register --name \"\$FOREMAN_SESSION\" --pane \"\$TMUX_PANE\" --workdir \"\$PWD\" --harness pi >/dev/null 2>&1 || true; pi --name \"$name\"$extra$first_msg; echo; echo \"[pi exited] press enter\"; read"
+session_arg="" parent_arg=""
+[ "$own_session" = no ] || session_arg=" --session-id $pi_session"
+[ -z "$coordinator" ] || parent_arg=" --parent \"\$FOREMAN_PARENT\""
+# Registration is bounded like foreman-send, so a hung board never keeps pi from starting.
+register="foreman session register --name \"\$FOREMAN_SESSION\" --pane \"\$TMUX_PANE\" --workdir \"\$PWD\" --harness pi$parent_arg"
+register="if command -v timeout >/dev/null 2>&1; then timeout --kill-after=1s 5s $register; else ($register &); fi >/dev/null 2>&1"
+launch="export FOREMAN_ACTOR=pi FOREMAN_SESSION=$name FOREMAN_PARENT=$coordinator FOREMAN_TICKETS=$(printf '%q' "${beads[*]:-}"); $register || true; pi --name \"$name\"$session_arg$extra$first_msg; echo; echo \"[pi exited] press enter\"; read"
 launch=${launch//\'/\'\\\'\'}
 target=$name
 if [ "$mode" = pane ]; then
@@ -99,9 +129,14 @@ if [ "${#beads[@]}" -gt 0 ]; then
     echo "warning: foreman not installed; continuing" >&2
   else
     sender=$(dirname "$(realpath "$0")")/../../foreman/scripts/foreman-send
+    # --name is the build; the caller's FOREMAN_SESSION stays the dispatching coordinator.
+    identity=(--name "$name")
+    [ -z "$pi_session" ] || identity+=(--pi-session "$pi_session")
+    [ -z "$coordinator" ] || identity+=(--coordinator "$coordinator")
     for id in "${beads[@]}"; do
-      (cd "$dir"; FOREMAN_ACTOR=pi FOREMAN_SESSION="$name" bash "$sender" dispatch "$id" \
-        --session "$name" --window "$target" --harness pi --model "$model" --workdir "$dir" \
+      (cd "$dir"; export FOREMAN_ACTOR=pi; [ -n "$coordinator" ] || unset FOREMAN_SESSION
+        bash "$sender" dispatch "$id" "${identity[@]}" \
+        --window "$target" --harness pi --model "$model" --workdir "$dir" \
         --branch "$branch" --base "$base" --brief "$brief" --report "$report") || \
         echo "warning: foreman adapter unavailable; continuing" >&2
     done

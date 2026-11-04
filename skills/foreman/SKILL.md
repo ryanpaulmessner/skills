@@ -49,9 +49,14 @@ and 3 for an out-of-order claim (current stage and allowed events). Keep that di
 retry blindly, fabricate intermediate events or call a warning a successful board update.
 `foreman show <id> --overlay --json` can clarify a refusal later. Read calls never spool.
 
-- **Identity:** build sessions inherit `FOREMAN_ACTOR=pi`, `FOREMAN_SESSION=<build-name>` from `pi-window` (also for pane builds).
+- **Identity:** build sessions inherit `FOREMAN_ACTOR=pi`, `FOREMAN_SESSION=<build-name>` and
+  `FOREMAN_PARENT=<coordinator>` from `pi-window` (also for pane builds).
   Coordinators set `FOREMAN_ACTOR` to their harness (`claude` or `pi`) and `FOREMAN_SESSION` to their
   own session name; `--actor` / `--session` override them. Without an actor the CLI says `user`.
+  The board keeps one row per live session name. `foreman coordinator` records its own row on
+  `$TMUX_PANE`. A session nothing else records registers itself:
+  `foreman session register --name <name> --workdir <abs-path> --harness claude|pi [--parent <coordinator>]`
+  (`--pane` defaults to `$TMUX_PANE`); the pi relay extension does this for named Pi sessions.
 - **Configuration:** inherit `FOREMAN_URL` (default `http://127.0.0.1:4747`) and `FOREMAN_TOKEN_FILE`
   from the user's environment. The token file has no default. Never print credentials, add secret
   paths to tracked files, create tokens, or change config to make a board call succeed.
@@ -64,7 +69,7 @@ retry blindly, fabricate intermediate events or call a warning a successful boar
 
 | When | CLI command (through `foreman-send`) |
 | --- | --- |
-| After launch (`pi-window` does this) | `foreman dispatch <id> --window <window> --harness pi --model <model> --workdir <path> --branch <branch> --base <sha> --brief <path> --report <path>` |
+| After launch (`pi-window` does this) | `foreman dispatch <id> --name <build> --pi-session <uuid> --coordinator <your session> --window <window> --harness pi --model <model> --workdir <path> --branch <branch> --base <sha> --brief <path> --report <path>` |
 | Build milestone: reproduced, slice green, gate passed | `foreman progress <id> "<what changed; next step>"` |
 | Report file written, before the done marker | `foreman report <id> --path <report>` |
 | Coordinator begins close-out, before gates/review | `foreman review <id>` |
@@ -73,6 +78,10 @@ retry blindly, fabricate intermediate events or call a warning a successful boar
 | Coordinator built and committed the work itself (no dispatch) | `FOREMAN_ACTOR=claude foreman commit <id> --sha <sha>` from queued, dispatched or building; records source `coordinator`. Pi cannot skip stages. |
 | User stops / resumes abandoned work | `foreman abandon <id>` / `foreman revive <id>` |
 
+Dispatch flags: `--name` is the build's own session name; `--pi-session` is the Pi session id the
+build was started with (`pi --session-id`), so it can be resumed; `--coordinator` is the dispatching
+coordinator, who gets close-out notes (without it the board uses the coordinator registered on
+`$TMUX_PANE`, else none). The older `--session <build>` still works; the board then finds the coordinator by pane only.
 For pane builds, dispatch's existing `--window` field carries the stable tmux `%pane-id`, while
 `FOREMAN_SESSION` stays the logical build name. The CLI has no separate `--pane` switch; do not invent one.
 
