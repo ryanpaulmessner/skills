@@ -77,8 +77,8 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
    - List each changed screen's states and their copy, using the `ui-patterns` skill.
    - Run the `ux-critique` skill on the rendered mockups (all its visual lenses; `heuristic-evaluation`
      for a multi-step flow). Fix what the mockup can fix; list the rest in the pack.
-   - New pages, a new section of the navigation, or renamed areas: name `information-architecture`*
-     (user-invoked) to the user before the mockups.
+   - New pages, a new section of the navigation, or renamed areas: post the `chore` card for
+     `/information-architecture`* (user-invoked; card shape in the `flow` skill) before the mockups.
 5. Save the file beside the spec. With a foreman draft epic, pass it on approval:
    `foreman epic approve draft:<slug> --project <p> --spec <spec> --design <pack>` (through the
    `foreman` skill). Tell the user the board's draft epic page shows the pack.

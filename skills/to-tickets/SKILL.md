@@ -12,6 +12,28 @@ Break a spec, plan, or conversation into **tickets**: tracer-bullet vertical sli
 tickets that **block** it, published to the repo's tracker. Then give a short rundown and stop for pushback.
 This skill plans; it never starts implementing.
 
+## 0. Start gate
+
+Run this skill only when one of these is true:
+
+- The user typed `/to-tickets` in this session.
+- The user answered **Break into tickets** on a board card for this spec (`state: answered`). The
+  Skill tool cannot start this skill, so read this file (`to-tickets/SKILL.md` in the skills directory)
+  and follow it.
+
+Otherwise, with an approved spec in hand, post the card and wait. Do not start on your own
+judgement, and do not ask only in chat:
+
+```bash
+foreman ask decision <epic-or-draft-ticket> --question "Break <spec name> into tickets?" \
+  --text $'What: break the approved spec into tickets with blocking edges\nPart of: <epic>\nFrom: <session>\nWhy now: the spec was approved; no build can start without tickets' \
+  --doc <spec path> --doc <design pack path> \
+  --option "Break into tickets" --option-detail "Break into tickets=I draft the tickets and send the list back on a card before I publish" \
+  --option "Not yet" --option-detail "Not yet=no tickets; say what to change in the note" \
+  --recommendation "Break into tickets"
+foreman wait <request-id> --timeout 7200   # background
+```
+
 ## 1. Gather context
 
 Detect the tracker in this repo: `tickets/` means ticket files (even if `.beads/` also exists);
@@ -87,7 +109,13 @@ Ask:
 - Is each blocking edge a genuine gate?
 - Should any tickets merge or split?
 
-Iterate until the user approves. Do not publish before approval.
+When the run started from a board card, or the user is not answering in this session, put the rundown
+on the board instead of only in chat: write it to `drafts/tickets/<spec-name>.md` (the numbered list
+and the three questions), then post `foreman ask decision` with `--doc` on that file, options
+**Publish** and **Change** (the note says what to change), and wait in the background. On **Change**,
+revise the file and the same card with `foreman ask update <request-id> --doc …`, then wait again.
+
+Iterate until the user approves (**Publish** on the card, or "publish" in chat). Do not publish before approval.
 
 ## 5. Publish
 

@@ -9,12 +9,19 @@ description: Map of the house skills and the order they run in. Use at the start
 
 Match the work to a line below, then read that skill's SKILL.md before acting on it or describing it to the user: these lines orient, the skill decides. If a line plausibly applies, open the skill. Process skills (spec, debug) run before implementation skills.
 
-Skills marked * are user-invoked. When one is due, name it to the user (`/tight-spec`); once they have asked for that step, read `../<name>/SKILL.md` and follow it.
+Skills marked * are user-invoked. When one is due and the user has not started it, post a `chore` card through the `foreman` skill, say it in chat too, and wait on the card in the background:
+
+```bash
+foreman ask chore <ticket> --question "Run /<skill> in <session>" \
+  --step "Open <session> (tmux pane <%pane-id>)" --step "Type: /<skill> <args>" --step "Click Done"
+```
+
+A note only in chat or a tmux pane never reaches the user. Once they have started that step, read `../<name>/SKILL.md` and follow it. Exception: for `to-tickets`, post its **Break into tickets** decision card instead (start gate in `../to-tickets/SKILL.md`); on that answer, read the file and follow it.
 
 ## New nontrivial work
 
 1. `tight-spec`*: goal, non-goals, acceptance checks, then a `design-pack` for a project: data, state and flow diagrams from the code, proposed state machines and stateful app flows checked with `statechart`*, mockups critiqued with `ux-critique`. Stop for user approval.
-2. `to-tickets`*: approved spec → tracker epic and vertical-slice tickets with blocking edges.
+2. `to-tickets`*: approved spec → tracker epic and vertical-slice tickets with blocking edges. Runs after the user answers its **Break into tickets** card.
 3. Rundown: your understanding in a few lines. Stop for user pushback.
 4. `implement`*: work the repo's ticket frontier ticket by ticket. `tdd` at seams, `verify-before-claiming` before any done-claim, `code-review` per ticket.
 

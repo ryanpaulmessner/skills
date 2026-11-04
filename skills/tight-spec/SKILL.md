@@ -139,7 +139,8 @@ Before asking for approval, you must be able to answer:
 
 Present the spec with a short list of the calls you made, and for a project the design pack (one line per
 part on what changes; the board's draft epic page draws it). "Sounds good" to an idea is not approval of a
-spec you haven't shown. Once approved: for a project, ask the user to run `/to-tickets <spec>` (it is user-invoked, so the
-Skill tool cannot start it); for a small change, proceed through the normal workflow.
+spec you haven't shown. Once approved: for a project, post the **Break into tickets** card from the
+`to-tickets` skill's start gate (read `../to-tickets/SKILL.md`) and wait on it; on that answer, follow
+that file. For a small change, proceed through the normal workflow.
 
 On project-spec approval, use the `foreman` skill to send `epic approve` (`approve_spec`) with the saved spec path and `--design <pack path>`; pass the draft slug, project, spec and pack paths to `to-tickets`.
