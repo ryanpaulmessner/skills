@@ -122,7 +122,9 @@ Iterate until the user approves (**Publish** on the card, or "publish" in chat).
 Publish from the main checkout in dependency order (blockers first), so each blocker names a real id.
 Build sessions hand ticket proposals to the coordinator rather than allocating ids in worktrees.
 
-- **Epic.** If the source is an existing ticket, it is the parent: don't close or rewrite it. Otherwise
+- **Epic.** If the source is an existing ticket, it is the parent: don't close it or rewrite its body,
+  but set its type to `epic` if it is not one already (`foreman update <id> --type epic`); the board
+  links a draft only to an epic. Otherwise
   create an epic whose body is the approved spec (Goal, Non-goals, Acceptance checks, Ask-first
   boundaries) so every ticket inherits it from one place.
 - **Files (`tickets/`).** Follow `references/files.md`: one `foreman new` per ticket with `--parent`
@@ -138,11 +140,30 @@ Give each ticket the slice of the design pack it builds: the ER fragment for its
 transitions it adds, the flow it makes work. Copy the Mermaid block (trimmed to that ticket) and link
 the pack; the builder builds to that shape.
 
-After publishing in either tracker, use the `foreman` skill to send `epic ticket <draft-slug> --project <project> --beads-epic-id <epic-id>` for the draft from `tight-spec`; skip when there is no draft. The legacy flag also accepts file-ticket epic ids.
+### Link the board draft (required)
+
+The board moves the initiative from "spec approved" to planned and shows its tickets only after this
+step. Run it directly, not through the best-effort sender, so a refusal is seen:
+
+1. Find the draft: the slug `tight-spec` passed, or the board draft whose spec path is this spec. No
+   draft exists only for a small chat-only spec; say so in the hand-back.
+2. `foreman epic ticket draft:<slug> --project <project> --beads-epic-id <epic-id>` (the legacy flag
+   takes file-ticket epic ids too).
+3. On a refusal, fix the cause and run it again:
+   - `file ticket must have type epic` / `beads_epic_required`: set the epic's type to `epic`, run
+     `foreman check`, and send it again. The board syncs the ticket on the next send.
+   - `invalid` from a state other than `spec_approved`: the spec approval event never reached the
+     board. Send `foreman epic approve draft:<slug> --project <project> --spec <spec> --design <pack>`,
+     then send `epic ticket` again.
+4. Still refused: post a `chore` card with the exact command and the error, and say it in chat. A
+   refusal written only in a handoff note is not done.
+
+Done when the board shows the draft as planned (`ticketed`) under the epic id, with its tickets.
 
 ## 6. Hand back
 
-Report the epic and ticket ids with titles, and the frontier: files use
+Report the epic and ticket ids with titles, the draft's board state (`ticketed`, or the open card),
+and the frontier: files use
 `foreman ready --json | jq --arg epic "$EPIC" '[.[] | select(.parent == $epic)]'`;
 beads use `bd ready --parent <epic>`. Say what can start now and what could run in parallel.
 Then stop. Implementation starts only when the user says so.
