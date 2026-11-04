@@ -47,7 +47,12 @@ count() {
 # The visible screen only (no scrollback): what the session shows right now.
 screen() { tmux capture-pane -p -J -t "$target" 2>/dev/null; }
 # Milliseconds since the epoch (bash 5 EPOCHREALTIME), so short idle limits are exact.
-now_ms() { local t=${EPOCHREALTIME/./}; echo "${t:0:-3}"; }
+now_ms() {
+  local t=${EPOCHREALTIME:-}
+  # macOS ships bash 3.2 without EPOCHREALTIME: fall back to whole seconds.
+  if [ -z "$t" ]; then echo $(( $(date +%s) * 1000 )); return; fi
+  t=${t/./}; echo "${t:0:${#t}-3}"
+}
 
 deadline=$((SECONDS + timeout))
 exists || { echo "GONE"; exit 2; }
