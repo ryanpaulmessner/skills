@@ -147,13 +147,13 @@ from = ["mattpocock:skills/engineering/prototype"]
 [[skill]]
 name = "research"
 job = "research"
-mode = "adopt"
+mode = "adapt"
 from = ["mattpocock:skills/engineering/research"]
 
 [[skill]]
 name = "pr"
 job = "pr-body"
-mode = "adopt"
+mode = "adapt"
 from = ["mattpocock:skills/engineering/pr"]
 
 [[skill]]
@@ -171,7 +171,7 @@ from = ["mattpocock:skills/productivity/grilling"]
 [[skill]]
 name = "handoff"
 job = "handoff"
-mode = "adopt"
+mode = "adapt"
 from = ["mattpocock:skills/productivity/handoff"]
 
 [[skill]]

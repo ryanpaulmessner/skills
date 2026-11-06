@@ -25,7 +25,7 @@ The map is a single issue on this repo's issue tracker, labelled `wayfinder:map`
 The map is an **index**, not a store. It lists the decisions made and points at the tickets that hold their detail; a decision lives in exactly one place, its ticket, so the map never restates it, only gists it and links.
 
 Detect the tracker per repo: `tickets/` means files (even with `.beads/` present); otherwise beads.
-Domain docs follow the repo's AGENTS.md. With neither directory, ask for user-approved `foreman adopt`.
+For document locations, use the `foreman` skill's Documents section; ticket research uses `foreman doc path report <id> --next`. With neither directory, ask for user-approved `foreman adopt`.
 Use the `foreman` skill for direct ticket commands, not the best-effort board sender. New tickets are
 created by the coordinator in the main checkout; build sessions report proposals instead.
 
@@ -137,7 +137,7 @@ User invokes with a loose idea.
 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** (the way to the destination is already clear, the whole journey small enough for one session), you don't need a map. Stop and ask the user how they'd like to proceed.
 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
 4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Write cross-references in that pass too, with real ids: a placeholder `#<n>` auto-links to an unrelated issue. Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
-5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that runs the `research` skill to resolve it in parallel, capturing its findings on a throwaway local `research/<name>` branch with a context pointer from the ticket. Leave the branch local (agents never push; the user pushes if they want it shared) and open no PR: it is never merged.
+5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that runs the `research` skill to resolve it in parallel, giving it the resolved absolute report path and linking the findings from the ticket.
 6. Stop: charting is one session's work; it hand-resolves nothing.
 
 ### Work through the map
