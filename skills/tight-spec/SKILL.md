@@ -38,7 +38,7 @@ words (the user can override):
 
 If it grows mid-interview, stop, say so, and step up a size.
 
-For a project only, use the `foreman` skill to create/reuse a draft epic (slug, configured project, spec path); keep that identity for the handoff, even if the board is unavailable.
+For a project only, use the `foreman` skill to create/reuse a draft epic (slug, configured project, spec path); choose the spec path from its Documents section and keep that identity for the handoff, even if the board is unavailable.
 
 ## 3. Interview
 

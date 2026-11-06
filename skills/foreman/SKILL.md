@@ -37,6 +37,57 @@ It registers the repo, creates or converts `tickets/`, updates instructions and 
 it stops before committing. Don't migrate incidentally or change config to make a command succeed.
 Legacy beads repos keep their embedded-store/export workflow until adopted.
 
+## Documents
+
+Get document paths from `foreman doc path`; do not invent a location. The layout is:
+
+| Path | Holds |
+| --- | --- |
+| `docs/*.md` | Long-lived repo documents |
+| `docs/specs/<slug>.md`, `<slug>.design.md`, `<slug>/` | Project spec, design pack, mockups and audits |
+| `docs/adr/NNNN-<slug>.md` | Architecture decisions |
+| `docs/machines/<name>.md` | Generated machine docs (foreman only) |
+| `builds/<ticket-id>/` | Working documents for a ticket (use the epic id for epic-wide work) |
+| `notes/<YYYY-MM-DD>-<kind>-<slug>.md` | Documents not about one ticket |
+| `handoffs/<coordinator>.md` | A coordinator's standing handoff |
+
+Slugs are lowercase kebab-case, at most 40 characters. Note kinds: `research`, `diagnostic`,
+`audit`, `update`, `message`, `check`, `decision`, `retro`.
+
+Fixed names inside a ticket's build directory:
+
+| Name | Holds |
+| --- | --- |
+| `brief.md`, `brief-r2.md` … | Builder prompts, including fix rounds |
+| `message-r<N>.md` | Follow-up to a running builder (starts at 1) |
+| `report.md`, `report-r2.md` … | Builder reports |
+| `review.md`, `review-r2.md` … | Reviews |
+| `loop.md` | Loop state |
+| `pr.md` | PR body |
+| `plan.md` | Build plan |
+| `evidence/` | Screenshots, verify runs and logs; any names inside |
+
+`foreman doc path <kind> <ticket-id>` prints an absolute path in the **main checkout of the
+repo holding the ticket**, never the builder's worktree or code repo. Supported ticket kinds are
+`brief`, `message`, `report`, `review`, `loop`, `pr`, `plan`, `evidence`; `--next` selects the next
+free round. Brief/report/review round 1 has no suffix; later rounds use `-r<N>`. Resolve the
+brief and report with `--next`, check their rounds agree, and give the builder the explicit absolute
+report path; pass it to dispatch as `--report`. Write to the supplied path, even from another checkout.
+
+For an unticketed note, run `foreman doc path note <kind> <slug>` in the intended repo. The CLI
+prints today's path. It does not allocate specs, design packs, ADRs or standing handoffs: use the
+table for those, keeping the draft's spec slug and the coordinator's identity. Create needed parent
+directories before writing. On a CLI error, read the diagnostic rather than inventing a path.
+
+Text documents are committed by the coordinator with ticket commits. Evidence stays in the main
+checkout and is git-ignored (`builds/*/evidence/`). Throwaway scripts and logs belong in the agent's
+scratchpad or `/private/tmp`, not this document layout.
+
+On commit, `foreman check` refuses newly added `.md` and `.html` documents outside the layout.
+`README.md`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md` anywhere and the repo's `[docs] allow` globs
+are exempt. Existing files in `[docs] legacy` folders may be edited, not newly added. Errors name
+the file and the `foreman doc path` command for its replacement.
+
 ## Board events: send without blocking work
 
 Replace the leading `foreman` in each command below with `bash <this-skill-dir>/scripts/foreman-send`.
