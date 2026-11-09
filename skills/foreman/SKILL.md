@@ -176,6 +176,14 @@ session as `[card question <request-id>] <text>`. Answer it on the card, not onl
 `foreman card-reply <request-id> --text "<answer>"` (or `--body-file <md>` for a longer answer).
 The card stays pending; asking is not answering. A card question never changes your task.
 
+**Save answers to Ryan's questions.** When you answer a question Ryan asked in chat and the answer
+stays true later (how something works, a command, a root cause, the reasons for a decision), also
+save it to the board's Answers page: `foreman answer --question "<his question>" --body-file <md>
+--repo <repo> [--ticket <id>] [--link <path-or-url>]`. The body stands alone: the answer, the
+evidence (`path:line`, commands) and the why. Skip status updates and one-off replies. If a saved
+answer changes, add a version with `foreman answer --update <id> --body-file <md>`; never save a
+second copy.
+
 ## Project-size specs only
 
 Keep one slug, configured project and spec path through `tight-spec` → `to-tickets`; carry them in
