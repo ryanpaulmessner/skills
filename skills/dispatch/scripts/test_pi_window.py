@@ -34,6 +34,9 @@ with open(os.environ["LOG"], "a") as f:
 FOREMAN = '''import json, os, sys
 with open(os.environ["LOG"], "a") as f:
     f.write(json.dumps(["foreman", os.environ.get("FOREMAN_ACTOR"), os.environ.get("FOREMAN_SESSION"), sys.argv[1:], os.getcwd()]) + "\\n")
+if sys.argv[1:3] == ["doc", "path"]:
+    print(os.environ.get("DOC_PATH", "/main checkout/builds/sk-1/report.md"))
+    sys.exit(int(os.environ.get("DOC_EXIT", "0")))
 sys.exit(int(os.environ.get("FOREMAN_EXIT", "0")))
 '''
 
@@ -88,6 +91,45 @@ class PiWindowTest(unittest.TestCase):
 
     def dispatches(self):
         return self.calls("foreman", ["dispatch"])
+
+    def test_default_report_uses_first_ticket_doc_path(self):
+        result = self.launch("--bead", "sk-1", "--bead", "sk-2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.dispatches()), 2)
+        for dispatch in self.dispatches():
+            args = dispatch[3]
+            self.assertEqual(args[args.index("--report") + 1],
+                             "/main checkout/builds/sk-1/report.md")
+        self.assertEqual(self.calls("foreman", ["doc", "path"])[0][3],
+                         ["doc", "path", "report", "sk-1"])
+
+    def test_no_ticket_keeps_legacy_fallback_without_doc_lookup(self):
+        result = self.launch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls("foreman", ["doc", "path"]), [])
+        self.assertEqual(self.dispatches(), [])
+        self.assertEqual(len(self.calls("pi")), 1)
+
+    def test_failed_doc_path_warns_and_records_legacy_fallback(self):
+        for output, code in (("error: unknown prefix", "1"), ("", "0"),
+                             ("warning: offline", "0"), ("/one\n/two", "0")):
+            with self.subTest(output=output, code=code):
+                self.log.unlink(missing_ok=True)
+                self.env.update(DOC_PATH=output, DOC_EXIT=code)
+                result = self.launch("--bead", "sk-1")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                args = self.dispatches()[0][3]
+                self.assertEqual(args[args.index("--report") + 1],
+                                 str(self.repo.resolve() / "drafts/sessions/slice.md"))
+                self.assertIn("warning: foreman doc path", result.stderr)
+                self.assertEqual(len(self.calls("pi")), 1)
+
+    def test_missing_cli_with_default_report_still_launches(self):
+        (self.bin / "foreman").unlink()
+        result = self.launch("--bead", "sk-1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("warning: foreman doc path", result.stderr)
+        self.assertEqual(len(self.calls("pi")), 1)
 
     def test_pane_launch_tags_titles_and_records_exact_target(self):
         self.env["TMUX_PANE"] = "%7"
@@ -265,7 +307,7 @@ class PiWindowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         args = self.dispatches()[0][3]
         for flag, expected in (("--branch", "unknown"), ("--base", "unknown"), ("--model", "default"),
-                               ("--report", str(self.repo / "drafts/sessions/slice.md"))):
+                               ("--report", "/main checkout/builds/sk-1/report.md")):
             self.assertEqual(args[args.index(flag) + 1], expected)
 
     def test_duplicate_window_never_launches_or_dispatches(self):

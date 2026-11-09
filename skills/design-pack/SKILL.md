@@ -8,8 +8,9 @@ description: Draw a spec's data, state, flow and UI views before approval. Use f
 # Design pack
 
 A design pack lets the user see a feature before approving the spec: which tables change, which state
-machines change, and how the main flows move through them. It is one Markdown file beside the spec,
-`<spec-name>.design.md`, with Mermaid diagrams. The foreman board draws them on the draft epic page.
+machines change, and how the main flows move through them. Save its Markdown file and mockups using
+the `foreman` skill's Documents section, with the spec's slug. The board draws its Mermaid diagrams
+on the draft epic page.
 
 Every project-size spec needs a pack before approval. A part can be skipped only with a one-line reason
 under its heading ("Skipped: no schema change"). A pack with every part skipped still exists, so the user
@@ -79,7 +80,7 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
      for a multi-step flow). Fix what the mockup can fix; list the rest in the pack.
    - New pages, a new section of the navigation, or renamed areas: post the `chore` card for
      `/information-architecture`* (user-invoked; card shape in the `flow` skill) before the mockups.
-5. Save the file beside the spec. With a foreman draft epic, pass it on approval:
+5. Save the file at the resolved pack path. With a foreman draft epic, pass it on approval:
    `foreman epic approve draft:<slug> --project <p> --spec <spec> --design <pack>` (through the
    `foreman` skill). Tell the user the board's draft epic page shows the pack.
 6. Present it with the spec: one line per part on what changes, and any spec fix the pack forced.

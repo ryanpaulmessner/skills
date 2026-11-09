@@ -44,7 +44,7 @@ Work from the conversation. If the user passes a reference (a ticket id, a spec 
 body, notes/comments, and children: files use `foreman show <id> --json` and `foreman tree <id> --json`;
 beads use `bd show <id>` and `bd list --parent <id>`.
 
-For a project spec, read its design pack (`<spec-name>.design.md` beside it). If it is missing, stop and
+For a project spec, read its design pack at the path defined in the `foreman` skill's Documents section. If it is missing, stop and
 run the `design-pack` skill, then show the pack to the user before drafting tickets: the user approves
 a spec with its pack, never without. A pack part skipped with a reason is fine.
 
@@ -110,8 +110,9 @@ Ask:
 - Should any tickets merge or split?
 
 When the run started from a board card, or the user is not answering in this session, put the rundown
-on the board instead of only in chat: write it to `drafts/tickets/<spec-name>.md` (the numbered list
-and the three questions), then post `foreman ask decision` with `--doc` on that file, options
+on the board instead of only in chat: write the numbered list and three questions to
+`$(foreman doc path plan <epic-id>)`, or `$(foreman doc path note decision <slug>)` before an epic
+exists; see the `foreman` skill's Documents section. Then post `foreman ask decision` with `--doc` on that file, options
 **Publish** and **Change** (the note says what to change), and wait in the background. On **Change**,
 revise the file and the same card with `foreman ask update <request-id> --doc …`, then wait again.
 
