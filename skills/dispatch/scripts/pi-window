@@ -73,6 +73,16 @@ dir=$(realpath "$dir")
 base=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || base=unknown
 branch=$(git -C "$dir" branch --show-current 2>/dev/null) || branch=unknown
 branch=${branch:-detached}
+if [ -z "$report" ] && [ "${#beads[@]}" -gt 0 ]; then
+  if command -v timeout >/dev/null 2>&1 &&
+     report=$(cd "$dir"; timeout --kill-after=1s 5s foreman doc path report "${beads[0]}") &&
+     [[ $report = /* && $report != *$'\n'* ]]; then
+    :
+  else
+    echo "warning: foreman doc path unavailable or invalid; using legacy report default" >&2
+    report=""
+  fi
+fi
 report=${report:-drafts/sessions/$name.md}
 [[ $report = /* ]] || report="$dir/$report"
 # With an explicit model, pi starts idle so Bifrost can be pinned before the first message:

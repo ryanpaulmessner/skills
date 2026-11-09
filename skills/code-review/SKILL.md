@@ -48,6 +48,8 @@ Briefs for each axis: `references/reviewer-briefs.md`.
 
 ### 4. Aggregate
 
+If saving the review, use `$(foreman doc path review <id> --next)`, or `$(foreman doc path note audit <slug>)` without a ticket; see the `foreman` skill's Documents section.
+
 Present each axis under its own heading (`## Standards`, `## Spec`, `## Risk`), lightly cleaned. Order findings
 by severity **within** an axis (Critical / Important / Minor); do not merge or rerank across axes, since a change
 can pass one and fail another. Include each reviewer's "declined to judge" list for the user to rule on. End with

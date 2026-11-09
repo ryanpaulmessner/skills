@@ -9,7 +9,9 @@ metadata:
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
-<!-- house: adopt; from: mattpocock:skills/engineering/pr@49dd158 -->
+<!-- house: adapt; from: mattpocock:skills/engineering/pr@49dd158 -->
+
+Save the PR body to `$(foreman doc path pr <id>)`; see the `foreman` skill's Documents section.
 
 Use this template for writing the PR body:
 
