@@ -220,7 +220,7 @@ response carries `standing_answer` (plain output prints JSON then): if it alread
 withdraw the new card. Withdraw your own stale card with
 `foreman withdraw <request-id> --reason "<why>"`; never leave Ryan a question that no longer applies.
 
-**Note to every coordinator** (coordinators only): `FOREMAN_ACTOR=claude FOREMAN_SESSION=<you> foreman note --all-coordinators "<text>" --json`. Read `delivered` and `skipped` (busy, ended or gone panes are skipped, never queued).
+**Note to every coordinator** (coordinators only): `FOREMAN_ACTOR=claude FOREMAN_SESSION=<you> foreman note --all-coordinators "<text>" --json`. Read `delivered` and `skipped` (busy, ended or gone panes are skipped, never queued). It is a broadcast: every registered session gets it, and `FOREMAN_SESSION` names only the sender. Use it only for news every coordinator must act on; to reply to one coordinator, send a cross-session message (SendMessage) to that session instead.
 
 **Card questions.** Ryan can ask about a pending card from the board. The question arrives in your
 session as `[card question <request-id>] <text>`. Answer it on the card, not only in chat:
