@@ -1,6 +1,6 @@
 ---
 name: foreman
-description: Use when managing repo tickets, build sessions, approvals inbox requests, coordinator close-out, onboarding with foreman adopt, or moving specs into tickets on foreman.
+description: Use for repo tickets, build sessions, approvals, close-out, foreman adopt or spec-to-ticket conversion.
 ---
 
 <!-- house: own -->
