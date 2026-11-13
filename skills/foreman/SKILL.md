@@ -124,7 +124,7 @@ retry blindly, fabricate intermediate events or call a warning a successful boar
 | Build milestone: reproduced, slice green, gate passed | `foreman progress <id> "<what changed; next step>"` |
 | Report file written, before the done marker | `foreman report <id> --path <report>` |
 | Coordinator begins close-out, before gates/review | `foreman review <id>` |
-| Review sends work back to the build session | `foreman changes <id> "<finding and required check>"` |
+| Pre-commit review sends work back to the build session | `foreman changes <id> "<finding and required check>"` |
 | Actual commit exists, user authorized it | `foreman commit <id> --sha <sha>` |
 | Coordinator built and committed the work itself (no dispatch) | `FOREMAN_ACTOR=claude foreman commit <id> --sha <sha>` from queued, dispatched or building; records source `coordinator`. Pi cannot skip stages. |
 | User stops / resumes abandoned work | `foreman abandon <id>` / `foreman revive <id>` |
@@ -136,9 +136,9 @@ coordinator, who gets close-out notes (without it the board uses the coordinator
 For pane builds, dispatch's existing `--window` field carries the stable tmux `%pane-id`, while
 `FOREMAN_SESSION` stays the logical build name. The CLI has no separate `--pane` switch; do not invent one.
 
-`changes` sends the machine's `request_changes` event. A correction cycle is changes → progress →
-report → review → commit; send review again for the new report. Never emit commit for planned or
-uncommitted work. A stage refusal prints the current `stage` and the `next_command`: run that, filled in, and never send invented intermediate events. Board success is not verification and grants no permission to commit or push.
+`changes` sends the machine's `request_changes` event from in_review. Before commit, a correction cycle is changes → progress → report → review → commit; send review again for the new report.
+After commit, Found a problem uses `dispatch` step 5 pane input, not `changes`: the builder fixes and writes its report; the coordinator reviews and commits again, then sends `foreman commit <id> --sha <new-sha>` (accepted from committed, staying committed), followed by a new review card on the new SHA. Keep report/review as artifacts and checks in this round, not board stage events; the full try-it correction loop is in `dispatch` close-out.
+Never emit commit for planned or uncommitted work. A stage refusal prints the current `stage` and the `next_command`: run that, filled in, and never send invented intermediate events. Board success is not verification and grants no permission to commit or push.
 
 ## Approval requests: ask and wait directly
 
@@ -149,11 +149,11 @@ Agents never push. Pushes go through board requests; the board worker performs a
 | Kind | Ask (returns a request UUID) |
 | --- | --- |
 | Build-time question | `foreman ask decision <ticket> --question "<question>" --text $'What: …\nPart of: …\nFrom: …\nWhy now: …' --option "<A>" --option-detail "<A>=<what happens>" --option "<B>" --option-detail "<B>=<what happens>" --recommendation "<A>"` |
-| Screenshots to review | `foreman ask review_ui <ticket> --question "Does <feature> look right?" --text "<What / Part of / Why now>" --image <file-or-folder> [--image …] --look-at "<what to check>"` (or `--artifact <https-url>`) |
+| Screenshots / try-it review | `foreman ask review_ui <ticket> --question "Does <feature> work?" --text "<What / Part of / Why now>" --image <file-or-folder> [--image …] --look-at "<what to check>" [--url <preview> --walkthrough <file> --video <webm> --sha <full-sha>]` (or `--artifact <https-url>` for screenshots). Add all four try-it flags for the live committed-preview review in `dispatch` close-out. |
 | Human step (sign-in, re-login, usage reset) | `foreman ask chore <ticket> --question "<what to do>" --step "<step>" [--step …] [--key "signin:<host>"]`: one Done button; the same key joins one pending chore across tickets and repos |
 | Several items, one question | `foreman ask batch <ticket> --question "<q>" --text "<What / Part of / Why now>" --item "<id>=<label>" [--item-detail "<id>=<detail>"] …`: one card, a checkbox per item; `outcome.answer` = checked ids (empty is valid). Use it instead of N identical cards |
 | Fix your pending card | `foreman ask update <request-id> [--question …] [--text …] [--option … --option-detail …] [--doc …]`: only the session that asked; options given replace the list; lint still applies |
-| Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` (branch with an open PR: add `--expected-old-head <its current remote sha>`) |
+| Push | `foreman ask push <ticket> --worktree <absolute-path> --branch <local-branch> --sha <full-sha> --remote-branch <destination>` (branch with an open PR: add `--expected-old-head <its current remote sha>`; try-it exception: `--no-try-it "<reason>"`, only under `dispatch`'s exception rule) |
 | Open PR | `foreman ask open_pr <ticket> --head <remote-branch> --sha <full-sha> --base <base-branch> --title "<title>" --body-file <body.md>` (`--base-ok` only for an exception you explain) |
 | Merge (board-merge repos only) | `foreman ask merge <ticket> --pr <number> --sha <expected-head-sha>` |
 
@@ -211,7 +211,7 @@ Part of, Why now or an option detail (`card_unclear` names what is missing). Scr
 `review_ui` card, never as local paths in text: `--image` takes PNG/JPEG/GIF/WebP files or a folder
 (a `verify ui` run folder gives width and theme from its result.json; otherwise `<path>@1440x900:dark`).
 Images must be under the repo, `~/.cache/verify/runs` or a folder you pass with `--scratchpad`; no
-symlinks. Options are fixed (Looks right / Change it); per-image comments come back in `note`. A card must make sense to
+symlinks. Screenshot-only options are Looks right / Change it; with `--url` they are Works / Found a problem. Per-image comments come back in `note`. Only the live-preview card satisfies the try-it push gate. A card must make sense to
 someone who has not read your session. To fix a pending card, use `ask update`; never withdraw and
 repost. Use a `chore` card, not a decision, for a step only Ryan can do. **Standing answers:** Ryan
 can mark an answer "Always". `ask decision` then refuses the same question and options
