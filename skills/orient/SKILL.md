@@ -9,7 +9,7 @@ description: "Coordinator start-of-session assessment, including when resuming a
 
 Give a brief assessment from live reads, then recommend one next step. On **every invocation**, including a resumed conversation, re-read the sources below; earlier context and handoffs are leads, not evidence.
 
-Read-only (except the capture-only ticket filing that step 5 allows): no dispatch, pane input, ticket edits, board events/requests, fetches, commits, pushes, service starts or repairs. Recommend actions; wait for the user's answer before switching to another workflow. REQUIRED: read the `foreman` skill for tracker precedence and read/configuration semantics; do not use its sender here.
+Read-only (except the capture-only ticket filing that step 6 allows): no dispatch, pane input, ticket edits, board events/requests, fetches, commits, pushes, service starts or repairs. Recommend actions; wait for the user's answer before switching to another workflow. REQUIRED: read the `foreman` skill for tracker precedence and read/configuration semantics; do not use its sender here.
 
 ## Gather
 
@@ -57,7 +57,9 @@ Read-only (except the capture-only ticket filing that step 5 allows): no dispatc
 
    Use the last command for each branch with an upstream, substituting the observed refs. Summarize ahead counts per repo **and branch**; do not sum overlapping branch histories. No upstream, gone upstream, detached HEAD or failed read means publication status unknown, not zero. Counts are against locally cached remote refs; do not fetch to refresh them. The user pushes. Finish with every scoped repo accounted for and that freshness caveat.
 
-5. **Repo extras.** For each main checkout in scope, if `<repo>/.agents/orient.md` exists, read it and run its checks (for example an external request queue that feeds the repo's tickets). The one write an extras file may allow is filing capture-only tickets (`foreman new`) for external items with no local ticket; it never allows status changes, closes or other writes. Report what each extras file found and every ticket it filed. A failed extras read is unknown, not empty.
+5. **Stale try-it previews.** Run `python3 ../dispatch/scripts/preview-cleanup.py --list-stale` (path relative to this skill directory). It lists unit, owner, ticket and reason without removing anything. Report matches under **Stale previews** and recommend removal; leave it to the user's next action. Only unreadable ticket or stage data is unknown, not an empty scan. A committed ticket is not stale: keep its preview.
+
+6. **Repo extras.** For each main checkout in scope, if `<repo>/.agents/orient.md` exists, read it and run its checks (for example an external request queue that feeds the repo's tickets). The one write an extras file may allow is filing capture-only tickets (`foreman new`) for external items with no local ticket; it never allows status changes, closes or other writes. Report what each extras file found and every ticket it filed. A failed extras read is unknown, not empty.
 
 ## If foreman is unavailable
 
@@ -72,6 +74,7 @@ Use these short sections; no raw JSON or full backlog dump:
 - **In flight:** ticket → server/session/window, state; reports needing review/commit.
 - **Frontier:** repo → epic groups and counts, a few candidate IDs; distinguish in-flight exclusions and incomplete scans.
 - **Unpushed:** repo/branch ahead counts, unknowns, cached-ref caveat.
+- **Stale previews:** listed try-it units and reasons, or none/unknown from the fresh scan; removal is a recommendation only.
 - **Repo extras** (only when an extras file exists): its findings and the tickets it filed.
 - **Next:** one recommended action with a reason. Prefer unblocking a human decision or closing out a report before another build; otherwise pick ready work with its dependency payoff.
 

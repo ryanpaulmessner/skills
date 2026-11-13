@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import time
 import unittest
@@ -18,6 +19,9 @@ class PiWaitTest(unittest.TestCase):
         root = Path(self.temp.name)
         bin_dir = root / "bin"
         bin_dir.mkdir()
+        md5sum = shutil.which("md5sum") or shutil.which("gmd5sum")
+        if md5sum:
+            (bin_dir / "md5sum").symlink_to(md5sum)
         self.pane = root / "pane"
         self.pane.write_text("")
         tmux = bin_dir / "tmux"
