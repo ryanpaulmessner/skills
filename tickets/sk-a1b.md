@@ -2,7 +2,7 @@
 id: sk-a1b
 title: "Try-it step in coordinator close-out"
 type: task
-status: open
+status: closed
 priority: 2
 parent: null
 blocked_by: ["sk-f19"]
@@ -11,8 +11,8 @@ supersedes: []
 discovered_from: null
 labels: []
 created: 2026-11-13
-closed: null
-close_reason: null
+closed: 2026-11-13
+close_reason: "skills PR merged (25637f8)"
 ---
 
 Part of foreman epic fm-uo5 (spec ~/dev/foreman/docs/specs/try-it.md, decisions 7, 9, 10, 11). Also blocked by foreman fm-uo5.1, fm-uo5.2 and fm-uo5.3 (cross-repo; not expressible as a file edge).
