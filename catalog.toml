@@ -29,6 +29,12 @@ pin = "653b6411c1f70c275a18e37673b042ff99f67ceb"
 scope = "plugins/show-me"
 
 [[skill]]
+name = "walkthrough"
+job = "guide-feature-replay"
+mode = "own"
+from = []
+
+[[skill]]
 name = "devserve"
 job = "worktree-previews"
 mode = "own"
