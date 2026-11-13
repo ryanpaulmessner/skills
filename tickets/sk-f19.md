@@ -2,7 +2,7 @@
 id: sk-f19
 title: "Walkthrough skill: player, recorder and live mode"
 type: task
-status: open
+status: closed
 priority: 2
 parent: null
 blocked_by: []
@@ -11,8 +11,8 @@ supersedes: []
 discovered_from: null
 labels: []
 created: 2026-11-13
-closed: null
-close_reason: null
+closed: 2026-11-13
+close_reason: "skills PR #4 merged (0ed745c)"
 ---
 
 Part of foreman epic fm-uo5 (spec ~/dev/foreman/docs/specs/try-it.md, decisions 13 to 15).
