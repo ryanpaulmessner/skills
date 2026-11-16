@@ -11,7 +11,8 @@
 # A session can also stop and wait unseen: at pi's "Trust project folder?" prompt (BLOCKED), or
 # asking a question with nothing on screen changing for PI_WAIT_IDLE seconds (default 600;
 # pi's spinner and counters move while it works) (IDLE, with the last screen lines).
-# exit 0 DONE (marker line), 5 LIMITED (prints the error line), 6 BLOCKED (prints the prompt),
+# exit 0 DONE (marker line), 5 LIMITED (visible footer provider/model when available, then error),
+#      6 BLOCKED (prints the prompt),
 #      7 IDLE (prints the last lines), 3 EXITED ("[pi exited] press enter" line), 4 timeout,
 #      2 target gone (or ambiguous pane tag), 1 usage.
 set -uo pipefail
@@ -46,6 +47,20 @@ count() {
 
 # The visible screen only (no scrollback): what the session shows right now.
 screen() { tmux capture-pane -p -J -t "$target" 2>/dev/null; }
+# Read the current footer, not launch metadata: the session may have switched models.
+# A narrow/custom footer can omit the provider; leave LIMITED bare rather than guess.
+model_identity() {
+  screen | awk '
+    /([0-9.]+%|\?)\/[0-9.]+[kM]? / && /  +\([a-z0-9_-]+\) [^ ]+ • / {
+      line = $0
+      sub(/^.*  +\(/, "", line)
+      split(line, fields, " ")
+      sub(/\)$/, "", fields[1])
+      identity = " provider=" fields[1] " model=" fields[2]
+    }
+    END { printf "%s", identity }'
+}
+
 # Milliseconds since the epoch (bash 5 EPOCHREALTIME), so short idle limits are exact.
 now_ms() {
   local t=${EPOCHREALTIME:-}
@@ -63,7 +78,7 @@ while :; do
   read -r now_done now_exit now_limit limit_line < <(count)
   # DONE beats LIMITED beats EXITED beats BLOCKED and IDLE: a finished session is done whatever follows.
   [ "$now_done" -gt "$base_done" ] && { echo DONE; exit 0; }
-  [ "$now_limit" -gt "$base_limit" ] && { echo LIMITED; echo "$limit_line"; exit 5; }
+  [ "$now_limit" -gt "$base_limit" ] && { echo "LIMITED$(model_identity)"; echo "$limit_line"; exit 5; }
   [ "$now_exit" -gt "$base_exit" ] && { echo EXITED; exit 3; }
   shown=$(screen)
   # pi's prompt: a line that is exactly the question, with its "Trust parent folder" option

@@ -60,6 +60,30 @@ elif sys.argv[1] == "capture-pane":
         self.assertEqual(code, 5)
         self.assertEqual(out, ["LIMITED", CODEX])
 
+    def test_limited_identifies_model_from_visible_footer(self):
+        code, out = self.wait(CODEX,
+            "$0.000 (sub) 2.1%/272k (auto)    (openai-codex) gpt-6-astra • high",
+            "● Bifrost · pinned")
+        self.assertEqual((code, out),
+                         (5, ["LIMITED provider=openai-codex model=gpt-6-astra", CODEX]))
+
+    def test_limited_reports_opus_after_model_switch(self):
+        line = "Error: 429 rate limit exceeded, retry later"
+        code, out = self.wait(line,
+            "↑12k ↓2k $1.234 4.2%/1.0M (auto)    (anthropic) claude-opus-5-5 • medium",
+            "● Bifrost · pinned",
+            before=["0.0%/272k (auto)    (openai-codex) gpt-6-astra • high"])
+        self.assertEqual((code, out),
+                         (5, ["LIMITED provider=anthropic model=claude-opus-5-5", line]))
+
+    def test_limited_does_not_guess_provider_from_narrow_footer(self):
+        self.assertEqual(self.wait(CODEX, "2.1%/272k (auto)    gpt-6-astra • high"),
+                         (5, ["LIMITED", CODEX]))
+
+    def test_model_mentioned_in_prose_is_not_footer_identity(self):
+        self.assertEqual(self.wait("Use (anthropic) claude-opus-5-5 • medium", CODEX),
+                         (5, ["LIMITED", CODEX]))
+
     def test_anthropic_extra_usage_refusal_is_a_limit(self):
         line = "Error: Third-party apps now draw from your extra usage"
         self.assertEqual(self.wait(line), (5, ["LIMITED", line]))

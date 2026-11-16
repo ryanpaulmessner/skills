@@ -39,9 +39,9 @@ Use when the user asked to delegate, or for long ticket sets where later tickets
 
 - **You are the controller.** You claim, review, rule, and close. You do not write ticket code yourself, so review stays independent and your context stays clean.
 - **One fresh implementer per ticket**, built from pointers (bead id, spec path, seams, constraints, report path), not pasted history. It runs `tdd`, never dispatches subagents itself, and returns a short status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT. Brief template: [references/subagent-mode.md](references/subagent-mode.md).
-- **Review between tickets.** After DONE, run `code-review` on BASE..HEAD yourself. Findings go back to the same implementer (resume, or a fresh one carrying the report file). After 3 fix rounds, stop dispatching: rule on each open finding in the bead notes, or escalate.
+- **Review between tickets.** After DONE, run `code-review` on BASE..HEAD yourself. Findings go back to the same implementer (resume, or a fresh one carrying the report file). For Pi builds, apply the `dispatch` skill's [Billing and fallback](../dispatch/SKILL.md#billing-and-fallback) policy to stuck reviews; for other harnesses, after 3 fix rounds rule on each open finding in the bead notes, or escalate.
 - **BLOCKED / NEEDS_CONTEXT** means something must change: more context, a stronger model, a smaller ticket, or a ruling. Never re-dispatch the identical brief.
-- **Model tier.** Name it explicitly; an omitted model inherits the session's. Cheap tier for tickets that are transcription of a complete spec; standard for multi-file work; strongest for design judgment and the final review.
+- **Model tier.** For Pi builds, use the `dispatch` skill's [Billing and fallback](../dispatch/SKILL.md#billing-and-fallback) policy. For other harnesses, name the tier explicitly (an omitted model inherits the session's): cheap for transcription of a complete spec, standard for multi-file work, strongest for design judgment and the final review.
 - **Batch small same-shape tickets** (the same one-line change across files) into one dispatch and one review.
 
 ### Parallel tickets
