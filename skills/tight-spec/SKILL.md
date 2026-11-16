@@ -125,7 +125,7 @@ highest one possible; fewest seams wins. Confirm the seams with the user.>
 For a project-size spec, save the spec at the draft's spec path and run the builder check in `references/builder-check.md` before handing it over.
 Then run the `design-pack` skill: data, state, flow and UI views beside the spec, "Now" drawn from the code,
 proposed machines checked with `statechart`, mockups critiqued with `ux-critique`. It
-is required for a project spec; a part may be skipped only with a stated reason. Fold any gap the pack
+is required for a project spec; a part is skipped only by the skip tests in `design-pack`. Fold any gap the pack
 exposes back into the spec.
 
 ## 5. Gate and hand off

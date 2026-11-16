@@ -12,7 +12,7 @@ Verifier-layer discipline: stop "looks right" or "I changed it" from becoming a 
 ## Rule
 
 **No completion claim without fresh evidence from this turn.** Run the narrowest faithful verifier, read its
-output, and report it. If verification is impossible, say exactly why and what risk remains.
+output, and report it. If verification is impossible, say exactly why and what risk remains, and ask the user on a `foreman ask decision` card to accept that risk. Until the user accepts it, the work is not done.
 
 This covers paraphrases too: "should work now", "looks correct", "Done!", "fixed", moving to the next task,
 committing, closing a bead or ticket, and reporting a delegated agent's work.

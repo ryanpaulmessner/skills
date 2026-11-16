@@ -22,8 +22,8 @@ Use the ref the user named (SHA, branch, tag, `main`, `HEAD~5`); ask if none. Th
 ### 2. Gather context
 
 - **Spec**, in order: issue/bead ids in commit messages (`bd show <id>`, or the repo's tracker), a path the user
-  gave, a spec under `docs/`/`specs/` matching the branch. If none, ask; if there is none, skip the Spec axis and
-  say so.
+  gave, a spec under `docs/`/`specs/` matching the branch. If none, ask the user. Skip the Spec axis only when the
+  user says there is no spec.
 - **Standards**: every file that says how code is written here: AGENTS.md/CLAUDE.md (root and local),
   CONTRIBUTING.md, CODING_STANDARDS.md, linter/formatter config. Always add the baseline in
   `references/standards-baseline.md`; documented repo standards override it, and tooling-enforced rules are

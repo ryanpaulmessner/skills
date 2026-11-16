@@ -46,7 +46,8 @@ beads use `bd show <id>` and `bd list --parent <id>`.
 
 For a project spec, read its design pack at the path defined in the `foreman` skill's Documents section. If it is missing, stop and
 run the `design-pack` skill, then show the pack to the user before drafting tickets: the user approves
-a spec with its pack, never without. A pack part skipped with a reason is fine.
+a spec with its pack, never without. A pack part may say "Skipped" only with one of the skip tests in
+`design-pack`; any other skip goes back to the user on a `foreman ask decision` card.
 
 ## 2. Explore the codebase
 

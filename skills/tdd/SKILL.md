@@ -21,7 +21,7 @@ A **seam** is the public boundary where behaviour is observed without reaching i
 
 ## 2. Does TDD fit?
 
-Default: yes, for new behaviour and bug fixes. It does not fit when the only test path needs broad harness setup, production-only state, a live client you cannot drive, or mocks of everything. Then say so, and use the closest faithful executable check instead (script, probe, replay, screenshot) via `verify-before-claiming`. **No new test beats a bad test.** Throwaway prototypes, generated code, and config are exempt. Any other skip is the user's call, not yours.
+Default: yes, for new behaviour and bug fixes. Throwaway prototypes, generated code, and config are exempt. **No new test beats a bad test.** If you think TDD does not fit (the only test path needs broad harness setup, production-only state, a live client you cannot drive, or mocks of everything), do not decide that yourself: ask the user on a `foreman ask decision` card ("no seam: <why>", with the closest executable check you would use instead: script, probe, replay, screenshot). Use that check only after the user answers.
 
 ## 3. The loop: one vertical slice at a time
 
@@ -29,7 +29,7 @@ Never write all the tests first (horizontal slicing tests imagined behaviour). E
 
 **RED.** Before writing the body, name the production break this test catches. Can't name one → it is a change detector or tautology; pick a behaviour instead. Write one test for one behaviour, with expected values derived independently (literal, worked example, spec), never recomputed the way the code does. Run it.
 - It must fail on its assertion, for the reason you named. A compile/link error, missing symbol, or crash is not RED yet: add the minimal stub (empty function, `{:error, :todo}`, `return 0`) and re-run.
-- Stub header-first: declare the signature, write the test, then add the stub body as its own edit of under 10 lines (one constant return per function). pi's write guard rejects 10+ line diffs that look like placeholders; if it still refuses, report the refusal and keep the link error as the RED evidence.
+- Stub header-first: declare the signature, write the test, then add the stub body as its own edit of under 10 lines (one constant return per function). pi's write guard rejects 10+ line diffs that look like placeholders. If it still refuses, stop and report the refusal; a link error is never RED evidence.
 - It passes? You are testing existing behaviour or the test is wrong. Fix the test.
 
 **GREEN.** Write the simplest code that passes. No speculative options, no anticipating the next test. Run the test; then the module's tests. Fails → fix the code, not the test.
@@ -62,4 +62,4 @@ Reproduce the bug as the smallest failing test at the nearest existing seam firs
 Feed this to `verify-before-claiming`:
 - **RED**: command, the failing output, why that failure was expected.
 - **GREEN**: command and passing output; full-suite command and result.
-- If no failing-first evidence was possible: why, and the executable check used instead.
+- If no failing-first evidence was possible: the `foreman ask decision` card id where the user agreed, and the executable check used instead.

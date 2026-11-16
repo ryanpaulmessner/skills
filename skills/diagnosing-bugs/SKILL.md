@@ -7,8 +7,8 @@ description: Root-cause diagnosis loop for bugs, failing tests, wrong behaviour,
 
 # Diagnosing Bugs
 
-**No fix without a root cause, and no root cause without a loop that goes red on this bug.** Skip a phase only
-with a stated reason.
+**No fix without a root cause, and no root cause without a loop that goes red on this bug.** Every phase runs.
+If a phase cannot run, stop and ask the user on a `foreman ask decision` card.
 
 Read the local AGENTS.md/CLAUDE.md, and any GLOSSARY.md or ADRs for the area, before touching code.
 

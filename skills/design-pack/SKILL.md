@@ -12,9 +12,16 @@ machines change, and how the main flows move through them. Save its Markdown fil
 the `foreman` skill's Documents section, with the spec's slug. The board draws its Mermaid diagrams
 on the draft epic page.
 
-Every project-size spec needs a pack before approval. A part can be skipped only with a one-line reason
-under its heading ("Skipped: no schema change"). A pack with every part skipped still exists, so the user
-sees that the question was asked.
+Every project-size spec needs a pack before approval. A part is skipped only when its test below holds;
+write the test under its heading ("Skipped: the spec changes no table or column"). A pack with every
+part skipped still exists, so the user sees that the question was asked.
+- Data: the spec changes no table or column.
+- State: the spec has no state table and names no state event.
+- Flows: Data and State are both skipped.
+- UI: the spec changes no page.
+
+If a part does not pass its test but you cannot draw it, ask the user on a `foreman ask decision` card.
+Do not skip it.
 
 ## Rules
 
@@ -60,18 +67,18 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
 ## UI
 <links to mockup artifacts built from the app's real CSS and markup, one line each on what it shows;
  per changed screen, its states (empty, loading, partial, error, success) and their copy;
- the ux-critique findings fixed or left open; or "Skipped: <reason>">
+ the ux-critique findings fixed or left open; or "Skipped: the spec changes no page">
 ```
 
 ## Steps
 
 1. Read the spec's Decisions (and its state table, if any). List the tables, machines and flows it
-   touches. If the list is empty for a part, write that part's skip reason now.
+   touches. If a part passes its skip test (above), write that test under its heading now.
 2. Read the current schema and machines from the code; draw "Now". Then draw "Proposed" with the marks.
    For each new or changed machine, and each stateful app flow, follow `../statechart/SKILL.md`: the
    spec's state table and rules become the model, and its chart is the Proposed diagram. A rule that
-   breaks is a spec gap: fix the spec, or ask the user, before approval. Without the toolchain, draw
-   Proposed by hand from the state table and say so in the pack.
+   breaks is a spec gap: fix the spec, or ask the user, before approval. A missing toolchain is not a
+   reason to draw by hand: post a `chore` card to install it (see `../statechart/SKILL.md`) and wait.
 3. Draw the flows. Every state event named in the spec appears in at least one flow; every new table
    is written or read in at least one flow. A gap here is usually a gap in the spec: fix the spec too.
 4. UI part: if the spec changes a page, build or link mockups (repo rules on mockups apply).
@@ -85,5 +92,5 @@ Spec: <spec path> · Drawn at: <repo> <short sha> · Legend: green = added, ambe
    `foreman` skill). Tell the user the board's draft epic page shows the pack.
 6. Present it with the spec: one line per part on what changes, and any spec fix the pack forced.
 
-Done when every part has diagrams or a skip reason, each "Now" diagram names its source, and the
+Done when every part has diagrams or a passed skip test, each "Now" diagram names its source, and the
 user has the pack in front of them before approving the spec.
