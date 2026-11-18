@@ -26,4 +26,7 @@ function step(state, event, error = '') {
   if (action === 'failed') return {state:{...state,phase:'failed',error},effects:[]};
   return {state:{...state,phase:state.index === state.total-1 ? 'complete' : 'ready',error:''},effects:[]};
 }
-module.exports = {initial,step,transitions};
+function presentational(event) {
+  return Object.values(presentation).some(table => Object.values(table).some(row => event in row));
+}
+module.exports = {initial,step,transitions,presentational};

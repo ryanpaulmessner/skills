@@ -25,3 +25,19 @@ test('record saves video and names a missing check step with a failing exit', {s
     }
   } finally { server.close(); fs.rmSync(dir,{recursive:true,force:true}); }
 });
+test('a recording step can move the panel off an app control it covers', {skip:!process.env.WALKTHROUGH_BROWSER_TEST}, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'walkthrough-test-'));
+  const page = '<button id="target" style="position:fixed;right:40px;top:60px" onclick="document.body.insertAdjacentHTML(\'beforeend\',\'<p id=done>Done</p>\')">Go</button>';
+  const server = http.createServer((req,res) => res.end(page));
+  await new Promise(r => server.listen(0,'127.0.0.1',r));
+  try {
+    const file = path.join(dir,'walkthrough.json');
+    fs.writeFileSync(file,JSON.stringify({intro:'Try it',seed:[],steps:[{say:'Press the covered button',changed:'',do:['goto /','click #__walkthrough_panel #side','click #target'],see:'Done',check:'#done'}]}));
+    const result = await new Promise(resolve => {
+      const child = spawn(process.execPath,[path.join(__dirname,'walkthrough.cjs'),'record',file,'--url',`http://127.0.0.1:${server.address().port}`,'--out',dir]);
+      let output = ''; child.stdout.on('data',b => output += b); child.stderr.on('data',b => output += b);
+      child.on('close',code => resolve({code,output}));
+    });
+    assert.equal(result.code,0,result.output);
+  } finally { server.close(); fs.rmSync(dir,{recursive:true,force:true}); }
+});

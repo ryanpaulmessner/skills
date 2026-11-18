@@ -31,3 +31,8 @@ test('player guards duplicate Next, retries failures, completes and revisits nar
   assert.deepEqual(step(state,'next'),{state,effects:[]});
   result = step(state,'back'); assert.equal(result.state.index,-1); assert.deepEqual(result.effects,[]);
 });
+test('only collapse, expand and switch-side are presentational', () => {
+  const {presentational} = require('./player.cjs');
+  for (const e of ['collapse','expand','switch-side']) assert.equal(presentational(e),true,e);
+  for (const e of ['next','back','retry','passed','failed']) assert.equal(presentational(e),false,e);
+});

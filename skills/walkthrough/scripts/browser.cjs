@@ -110,8 +110,11 @@ async function start(doc, options) {
       await render();
     }
   };
+  // A recording runs the steps itself; a step may still move or collapse the
+  // panel (presentation only) so it does not cover the app.
   await page.exposeBinding('__walkthroughMove', async (_, direction) => {
     if (!recording) await move(direction);
+    else if (player.presentational(direction)) { state = player.step(state,direction).state; await render(); }
   });
   page.on('domcontentloaded', () => render().catch(() => {}));
   page.on('close', () => { closed = true; });
